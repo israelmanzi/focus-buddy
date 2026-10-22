@@ -12,8 +12,8 @@ interface Platform {
     /** True on platforms where leaving the app during a session should count as an interruption. */
     val leavingAppInterrupts: Boolean
 
-    /** Session started or changed. `endsAtMs` is null for count-up sessions. */
-    fun onSessionStarted(endsAtMs: Long?, deepFocus: Boolean, rules: BlockRules) {}
+    /** Session started or resumed. `endsAtMs` is null for count-up sessions. */
+    fun onSessionStarted(startedAtMs: Long, endsAtMs: Long?, deepFocus: Boolean, rules: BlockRules) {}
     fun onSessionEnded() {}
 
     /** The user left the app mid-session; nudge them back before `deadlineMs`. */

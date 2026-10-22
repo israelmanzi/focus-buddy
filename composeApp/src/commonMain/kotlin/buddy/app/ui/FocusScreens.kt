@@ -204,7 +204,7 @@ fun RunningScreen(controller: AppController, phase: Phase.Running) {
     val freeLeft = controller.freeCancelLeft(rs)
     val tagInfo = state.tags[rs.tag]
 
-    Box(Modifier.fillMaxSize().background(Color(0xF0302A26)).clickable(enabled = false) {}) {
+    Box(Modifier.fillMaxSize().background(Color(0xFF302A26)).clickable(enabled = false) {}) {
         Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Spacer(Modifier.height(24.dp))
             Text(
@@ -300,7 +300,7 @@ fun BreakOffer(controller: AppController) {
 fun BreakScreen(controller: AppController, phase: Phase.OnBreak) {
     val now = rememberNow(controller)
     val state by controller.state.collectAsState()
-    Box(Modifier.fillMaxSize().background(Color(0xF0E9F4EC))) {
+    Box(Modifier.fillMaxSize().background(Color(0xFFE9F4EC))) {
         Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Spacer(Modifier.height(24.dp))
             Text("Break time — stretch, sip, breathe.", style = label(18.sp), textAlign = TextAlign.Center)

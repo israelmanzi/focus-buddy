@@ -93,7 +93,7 @@ class AppController(
         saveMeta(meta.copy(running = rs, breakEndsAt = null))
         _phase.value = Phase.Running(rs)
         val s = _settings.value
-        platform.onSessionStarted(if (countUp) null else rs.startedAt + planned * 60_000L, deepFocus, BlockRules(s.allowMode, s.packages))
+        platform.onSessionStarted(rs.startedAt, if (countUp) null else rs.startedAt + planned * 60_000L, deepFocus, BlockRules(s.allowMode, s.packages))
         platform.keepScreenOn(s.screenOn)
         startSessionTicker()
     }
@@ -142,7 +142,7 @@ class AppController(
         _phase.value = Phase.Running(rs)
         if (!checkSession(rs)) {
             val s = _settings.value
-            platform.onSessionStarted(if (rs.countUp) null else rs.startedAt + rs.plannedMin * 60_000L, rs.deepFocus, BlockRules(s.allowMode, s.packages))
+            platform.onSessionStarted(rs.startedAt, if (rs.countUp) null else rs.startedAt + rs.plannedMin * 60_000L, rs.deepFocus, BlockRules(s.allowMode, s.packages))
             startSessionTicker()
         }
     }

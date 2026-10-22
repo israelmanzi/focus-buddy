@@ -28,6 +28,7 @@ class AndroidPlatform(private val app: Application) : Platform {
     override val name = "android"
     override val dataDir: File = File(app.filesDir, "buddy")
     override val leavingAppInterrupts = true
+    override val backupDir: File get() = File(app.getExternalFilesDir(null) ?: app.filesDir, "backups")
     override val supportsDeepFocus = true
 
     private val prefs = prefs(app)
@@ -39,17 +40,13 @@ class AndroidPlatform(private val app: Application) : Platform {
         app.registerActivityLifecycleCallbacks(ActivityTracker)
     }
 
-    override fun onSessionStarted(endsAtMs: Long?, deepFocus: Boolean, rules: BlockRules) {
+    override fun onSessionStarted(startedAtMs: Long, endsAtMs: Long?, deepFocus: Boolean, rules: BlockRules) {
         Notify.cancel(app, Notify.ID_BREAK)
         askNotificationPermission()
-        // Count-up sessions have no end, so remember when this one began for the chronometer.
-        val startedAt = prefs.getLong(KEY_START, 0).takeIf { it > 0 }
-            ?: System.currentTimeMillis().also { prefs.edit { putLong(KEY_START, it) } }
-        FocusService.start(app, endsAtMs, startedAt, deepFocus, rules)
+        FocusService.start(app, endsAtMs, startedAtMs, deepFocus, rules)
     }
 
     override fun onSessionEnded() {
-        prefs.edit { remove(KEY_START) }
         Notify.cancel(app, Notify.ID_NUDGE)
         app.stopService(Intent(app, FocusService::class.java))
     }
@@ -135,7 +132,6 @@ class AndroidPlatform(private val app: Application) : Platform {
     )
 
     companion object {
-        const val KEY_START = "sessionStart"
         const val KEY_BREAK = "breakEndsAt"
         fun prefs(ctx: Context) = ctx.getSharedPreferences("platform", Context.MODE_PRIVATE)!!
     }
