@@ -7,3 +7,4 @@ local.properties
 docs/reference/
 *.keystore
 release/
+focus-buddy.db*

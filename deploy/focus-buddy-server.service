@@ -1,0 +1,34 @@
+[Unit]
+Description=Focus Buddy sync server
+Wants=network-online.target tailscaled.service
+After=network-online.target tailscaled.service
+
+[Service]
+Type=simple
+User=focusbuddy
+Group=focusbuddy
+EnvironmentFile=/etc/focus-buddy.env
+Environment=BUDDY_DB=/var/lib/focus-buddy/focus-buddy.db
+StateDirectory=focus-buddy
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/focus-buddy
+ExecStart=/usr/bin/java -Xmx96m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -jar /opt/focus-buddy/focus-buddy-server.jar
+# The Tailscale IP may not be assigned yet right after boot; keep retrying until it is.
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=143
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
