@@ -23,6 +23,8 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import java.util.UUID
 
+private const val SYNC_PAGE = 5000
+
 sealed interface Phase {
     data object Idle : Phase
     data class Running(val session: RunningSession) : Phase
@@ -268,15 +270,20 @@ class AppController(
         val s = _settings.value
         if (s.syncUrl.isBlank() || _sync.value == SyncStatus.Syncing) return
         _sync.value = SyncStatus.Syncing
-        val sending = meta.pending.mapNotNull { events[it] }
         try {
-            val res = syncClient.sync(s.syncUrl, s.syncToken, SyncRequest(meta.syncCursor, sending))
-            val fresh = res.events.filter { it.id !in events }
-            fresh.forEach { events[it.id] = it }
-            store.append(fresh)
-            val sentIds = sending.map { it.id }.toSet()
-            saveMeta(meta.copy(syncCursor = res.cursor, pending = meta.pending.filter { it !in sentIds }))
-            if (fresh.isNotEmpty()) _state.value = GameState.fold(events.values)
+            var anyFresh = false
+            // the server pages large backlogs; keep pulling until a page comes back short
+            do {
+                val sending = meta.pending.mapNotNull { events[it] }
+                val res = syncClient.sync(s.syncUrl, s.syncToken, SyncRequest(meta.syncCursor, sending))
+                val fresh = res.events.filter { it.id !in events }
+                fresh.forEach { events[it.id] = it }
+                store.append(fresh)
+                val sentIds = sending.map { it.id }.toSet()
+                saveMeta(meta.copy(syncCursor = res.cursor, pending = meta.pending.filter { it !in sentIds }))
+                anyFresh = anyFresh || fresh.isNotEmpty()
+            } while (res.events.size >= SYNC_PAGE)
+            if (anyFresh) _state.value = GameState.fold(events.values)
             _sync.value = SyncStatus.Ok(clock())
         } catch (t: Throwable) {
             if (t is kotlinx.coroutines.CancellationException) { _sync.value = SyncStatus.Failed("cancelled"); throw t }

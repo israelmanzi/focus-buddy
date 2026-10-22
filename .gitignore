@@ -8,3 +8,4 @@ docs/reference/
 *.keystore
 release/
 focus-buddy.db*
+.claude/

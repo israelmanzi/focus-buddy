@@ -16,9 +16,11 @@ object DesktopPlatform : Platform {
         "focus-buddy",
     )
     override val leavingAppInterrupts = false
+    override val backupDir = File(System.getProperty("user.home"), "Documents/Focus Buddy")
 }
 
 fun main() {
+    System.getenv("BUDDY_PREVIEW")?.let { renderPreviews(File(it)); renderScreens(File(it), File(it, "profiles")); return }
     val controller = AppController(DesktopPlatform, MainScope())
     application {
         Window(

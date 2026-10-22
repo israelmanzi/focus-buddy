@@ -30,6 +30,20 @@ interface Platform {
     fun deepFocusReady(): Boolean = false
     fun requestDeepFocusPermissions() {}
     suspend fun launchableApps(): List<AppInfo> = emptyList()
+
+    /** Where backups are written and looked for. */
+    val backupDir: File get() = File(dataDir, "backups")
+
+    /** Writes a backup file and returns its path. */
+    fun saveBackup(json: String): String {
+        backupDir.mkdirs()
+        val f = File(backupDir, "focus-buddy-backup-${System.currentTimeMillis() / 1000}.json")
+        f.writeText(json)
+        return f.absolutePath
+    }
+
+    /** Newest backup file in [backupDir], if any. */
+    fun newestBackup(): File? = backupDir.listFiles { f -> f.name.endsWith(".json") }?.maxByOrNull { it.lastModified() }
 }
 
 data class BlockRules(val allowMode: Boolean, val packages: Set<String>)
