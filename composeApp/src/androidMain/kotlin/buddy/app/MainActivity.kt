@@ -1,6 +1,7 @@
 package buddy.app
 
 import android.os.Bundle
+import android.os.PowerManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,7 +24,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        if (!isChangingConfigurations) (application as BuddyApplication).controller.onAppBackgrounded()
+        // Turning the screen off is not leaving the app: locking the phone must not end a session.
+        val screenOff = !getSystemService(PowerManager::class.java).isInteractive
+        if (!isChangingConfigurations && !screenOff) (application as BuddyApplication).controller.onAppBackgrounded()
     }
 
     override fun onDestroy() {
