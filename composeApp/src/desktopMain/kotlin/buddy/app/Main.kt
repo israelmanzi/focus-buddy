@@ -5,21 +5,20 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.window.application
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
-import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import buddy.app.ui.App
-import buddy.resources.Res
-import buddy.resources.focus_buddy
 import kotlinx.coroutines.MainScope
-import org.jetbrains.compose.resources.painterResource
 import java.awt.Dimension
+import java.awt.MenuItem
+import java.awt.PopupMenu
+import java.awt.SystemTray
+import java.awt.TrayIcon
 import java.awt.Toolkit
 import java.io.File
 
@@ -109,7 +108,6 @@ fun main() {
     application {
         var awtWindow by remember { mutableStateOf<java.awt.Window?>(null) }
         val windowState = rememberWindowState(position = initialPos, size = initialSize)
-        val icon: Painter = painterResource(Res.drawable.focus_buddy)
 
         // Closing hides to the tray instead of disposing the window: disposing a Skiko/X11 window
         // crashes inside libX11 on some Fedora + Mesa combinations.
@@ -149,7 +147,6 @@ fun main() {
             onCloseRequest = { closeWindow() },
             state = windowState,
             title = "Focus Buddy",
-            icon = icon,
         ) {
             LaunchedEffect(Unit) {
                 awtWindow = window
@@ -161,25 +158,44 @@ fun main() {
             App(controller)
         }
 
-        if (traySupported) Tray(
-            icon = icon,
-            tooltip = "Focus Buddy",
-            onAction = { restore() },
-            menu = {
-                Item("Open Focus Buddy") { restore() }
-                Separator()
-                if (controller.phase.value !is Phase.Running) Item("Start a focus session") {
-                    restore()
-                    controller.startSession(
-                        controller.settings.value.defaultMinutes,
-                        controller.settings.value.countUp,
-                        controller.settings.value.lastTag,
-                        false,
-                    )
-                } else Item("Stop session") { controller.stopSession() }
-                Separator()
-                Item("Quit") { quit() }
-            },
-        )
+        // AWT tray with an ARGB image: Compose's Tray takes a Painter and flattens transparency,
+        // which made the round icon show on an opaque square.
+        if (traySupported) LaunchedEffect(Unit) {
+            val tray = SystemTray.getSystemTray()
+            val src = loadIconImage() ?: return@LaunchedEffect
+            val dim = tray.trayIconSize
+            val image = src.getScaledInstance(dim.width, dim.height, java.awt.Image.SCALE_SMOOTH)
+            val trayIcon = TrayIcon(image, "Focus Buddy")
+            trayIcon.isImageAutoSize = true
+
+            fun buildMenu() {
+                val m = PopupMenu()
+                MenuItem("Open Focus Buddy").apply { addActionListener { restore() }; m.add(this) }
+                if (controller.phase.value is Phase.Running) {
+                    MenuItem("Stop session").apply { addActionListener { controller.stopSession() }; m.add(this) }
+                } else {
+                    MenuItem("Start a focus session").apply {
+                        addActionListener {
+                            restore()
+                            controller.startSession(
+                                controller.settings.value.defaultMinutes,
+                                controller.settings.value.countUp,
+                                controller.settings.value.lastTag,
+                                false,
+                            )
+                        }
+                        m.add(this)
+                    }
+                }
+                m.addSeparator()
+                MenuItem("Quit").apply { addActionListener { quit() }; m.add(this) }
+                trayIcon.popupMenu = m
+            }
+
+            buildMenu()
+            trayIcon.addActionListener { restore() }
+            runCatching { tray.add(trayIcon) }
+            controller.phase.collect { java.awt.EventQueue.invokeLater { buildMenu() } }
+        }
     }
 }
