@@ -227,6 +227,20 @@ fun DrawScope.drawRoomShell(g: RoomGeometry, roomId: String) {
 }
 
 
+/** Rasterised decor art, keyed by item, pixel size and night variant. */
+private val decorBitmaps = HashMap<DecorKey, androidx.compose.ui.graphics.ImageBitmap>()
+private data class DecorKey(val id: String, val w: Int, val h: Int, val night: Boolean)
+
+private fun DrawScope.decorBitmap(item: Catalog.DecorItem, w: Int, h: Int, night: Boolean): androidx.compose.ui.graphics.ImageBitmap =
+    decorBitmaps.getOrPut(DecorKey(item.id, w, h, night)) {
+        val bmp = androidx.compose.ui.graphics.ImageBitmap(w, h)
+        val canvas = androidx.compose.ui.graphics.Canvas(bmp)
+        androidx.compose.ui.graphics.drawscope.CanvasDrawScope().draw(
+            this, layoutDirection, canvas, Size(w.toFloat(), h.toFloat()),
+        ) { drawDecor(item, Offset.Zero, Size(w.toFloat(), h.toFloat()), night) }
+        bmp
+    }
+
 /** Draws a decor item inside a slot rect, skewed onto the wall when needed. */
 fun DrawScope.drawSlotItem(g: RoomGeometry, slot: Catalog.Slot, roomId: String, item: Catalog.DecorItem, alpha: Float = 1f, night: Boolean = false) {
     val r = g.slotRect(slot, roomId)
@@ -240,10 +254,12 @@ fun DrawScope.drawSlotItem(g: RoomGeometry, slot: Catalog.Slot, roomId: String, 
             transform(m)
         }
     }) {
+        val w = r.size.width.toInt().coerceAtLeast(1)
+        val h = r.size.height.toInt().coerceAtLeast(1)
         if (alpha < 1f) {
             drawContext.canvas.saveLayer(Rect(Offset.Zero, size), androidx.compose.ui.graphics.Paint().apply { this.alpha = alpha })
-            drawDecor(item, r.topLeft, r.size, night)
+            drawImage(decorBitmap(item, w, h, night), r.topLeft)
             drawContext.canvas.restore()
-        } else drawDecor(item, r.topLeft, r.size, night)
+        } else drawImage(decorBitmap(item, w, h, night), r.topLeft)
     }
 }

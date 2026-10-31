@@ -76,13 +76,14 @@ fun App(controller: AppController, initialSheet: Sheet = Sheet.NONE, initialDeco
         val sky = skyFor(hour)
 
         val busy = phase !is Phase.Idle
-        val actor = rememberWanderingPip(enabled = !busy && !decorating && sheet == Sheet.NONE)
+        val focused = androidx.compose.ui.platform.LocalWindowInfo.current.isWindowFocused
+        val actor = rememberWanderingPip(enabled = !busy && !decorating && sheet == Sheet.NONE && focused)
 
         // Keyboard: Esc closes whatever is open, Space opens the focus sheet (desktop-friendly).
         val keyboard = remember { FocusRequester() }
         LaunchedEffect(Unit) { runCatching { keyboard.requestFocus() } }
 
-        val skyTime = buddy.app.art.rememberSeconds()
+        val skyTime = buddy.app.art.rememberSeconds(active = focused)
         Box(
             Modifier.fillMaxSize()
                 .focusRequester(keyboard)
@@ -132,6 +133,7 @@ fun App(controller: AppController, initialSheet: Sheet = Sheet.NONE, initialDeco
                         onSlotTap = { pickingSlot = it },
                         onPipTap = { line = idleLines.filter { it != line }.random(); actor.mood = buddy.app.art.Mood.HAPPY },
                         night = sky.isNight,
+                        animate = focused || busy,
                     )
                 }
                 // bottom controls

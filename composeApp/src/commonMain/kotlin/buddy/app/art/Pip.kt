@@ -6,7 +6,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -43,13 +43,21 @@ fun skinColors(skin: String): SkinColors = when (skin) {
     else -> SkinColors(Color(0xFFF6E2C4), Color(0xFFE8CBA4))
 }
 
-/** Seconds since first composition, updated every frame. */
+/**
+ * Seconds since first composition, ticking [fps] times a second. A delay loop rather than
+ * withFrameNanos: awaiting frames keeps the compositor running at the display rate even when
+ * nothing changed, which burns a whole core while the app sits idle.
+ */
 @Composable
-fun rememberSeconds(): State<Float> {
+fun rememberSeconds(fps: Int = 12, active: Boolean = true): State<Float> {
     val s = remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(Unit) {
-        val start = withFrameNanos { it }
-        while (true) withFrameNanos { s.floatValue = (it - start) / 1e9f }
+    LaunchedEffect(fps, active) {
+        if (!active) return@LaunchedEffect
+        val step = 1000L / fps
+        while (true) {
+            delay(step)
+            s.floatValue += 1f / fps
+        }
     }
     return s
 }

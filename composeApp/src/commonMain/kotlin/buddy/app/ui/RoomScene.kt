@@ -18,7 +18,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Canvas as GCanvas
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -80,6 +83,22 @@ fun rememberWanderingPip(enabled: Boolean): PipActor {
 }
 
 /** A decor slot paired with its floor depth, computed once per scene size. */
+/** Room shells are pure vector paths; rasterise once per size instead of every frame. */
+private val shellCache = HashMap<Triple<String, Int, Int>, ImageBitmap>()
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.shellBitmap(g: RoomGeometry, roomId: String): ImageBitmap {
+    val w = g.size.width.toInt().coerceAtLeast(1)
+    val h = g.size.height.toInt().coerceAtLeast(1)
+    return shellCache.getOrPut(Triple(roomId, w, h)) {
+        val bmp = ImageBitmap(w, h)
+        val canvas = GCanvas(bmp)
+        CanvasDrawScope().draw(this, layoutDirection, canvas, androidx.compose.ui.geometry.Size(w.toFloat(), h.toFloat())) {
+            drawRoomShell(g, roomId)
+        }
+        bmp
+    }
+}
+
 private data class Placed(val slot: Catalog.Slot, val bottom: Float)
 
 /**
@@ -103,9 +122,10 @@ fun RoomScene(
     onSlotTap: (Catalog.Slot) -> Unit = {},
     onPipTap: () -> Unit = {},
     night: Boolean = false,
+    animate: Boolean = true,
 ) {
     val room = Catalog.room(roomId) ?: return
-    val t = rememberSeconds()
+    val t = rememberSeconds(active = animate)
     var sceneSize by remember { mutableStateOf(Size.Zero) }
     val geometry = remember(sceneSize) { RoomGeometry(sceneSize) }
 
@@ -149,7 +169,7 @@ fun RoomScene(
                 },
         ) {
             val g = geometry
-            drawRoomShell(g, roomId)
+            drawImage(shellBitmap(g, roomId), Offset.Zero)
             for ((slot, item) in wallItems) drawSlotItem(g, slot, roomId, item, night = night)
 
             // Depth-sort the moving Pip against the pre-sorted floor items.
