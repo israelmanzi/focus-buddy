@@ -86,6 +86,7 @@ android {
 compose.desktop {
     application {
         mainClass = "buddy.app.MainKt"
+        jvmArgs += listOf("--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED")
         nativeDistributions {
             targetFormats(TargetFormat.Rpm, TargetFormat.Deb, TargetFormat.AppImage)
             packageName = "focus-buddy"
@@ -93,4 +94,8 @@ compose.desktop {
             linux { iconFile.set(project.file("icon.png")) }
         }
     }
+}
+
+compose.resources {
+    packageOfResClass = "buddy.resources"
 }

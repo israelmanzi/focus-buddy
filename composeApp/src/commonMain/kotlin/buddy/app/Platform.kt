@@ -35,6 +35,9 @@ interface Platform {
     /** Soft looping pad while a session runs. */
     fun setAmbient(on: Boolean) {}
 
+    /** System notification (desktop); Android has its own channels and leaves this unimplemented. */
+    fun showNotification(title: String, body: String) {}
+
     /** Android can deliver break notifications late without this; elsewhere it is always granted. */
     val supportsExactAlarms: Boolean get() = false
     fun exactAlarmsGranted(): Boolean = true

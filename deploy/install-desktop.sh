@@ -15,7 +15,7 @@ install -m 644 "$ROOT/composeApp/icon.png" "$APP_DIR/icon.png"
 
 cat > "$HOME/.local/bin/focus-buddy" <<SH
 #!/bin/sh
-exec "$JAVA" -Xmx256m -jar "$APP_DIR/focus-buddy.jar" "\$@"
+exec "$JAVA" -Xmx256m --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED -jar "$APP_DIR/focus-buddy.jar" "\$@"
 SH
 chmod 755 "$HOME/.local/bin/focus-buddy"
 
@@ -27,7 +27,7 @@ Comment=Cozy focus timer with Pip
 Exec=$HOME/.local/bin/focus-buddy
 Icon=$APP_DIR/icon.png
 Categories=Utility;Office;
-StartupWMClass=buddy-app-MainKt
+StartupWMClass=focus-buddy
 DESKTOP
 update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
 echo "Installed. Launch 'Focus Buddy' from your app menu or run: focus-buddy"

@@ -195,8 +195,12 @@ class AppController(
         val reward = Rules.reward(session)
         endSession(rs, session)
         _phase.value = when {
-            reward > 0 -> Phase.Rewarded(reward, (sec / 60).toInt())
-            else -> Phase.Interrupted((sec / 60).toInt())
+            reward > 0 -> Phase.Rewarded(reward, (sec / 60).toInt()).also {
+                platform.showNotification("Session complete", "+$reward acorns · ${sec / 60} min focused")
+            }
+            else -> Phase.Interrupted((sec / 60).toInt()).also {
+                platform.showNotification("Session ended early", "No acorns this time — ready to try again?")
+            }
         }
     }
 

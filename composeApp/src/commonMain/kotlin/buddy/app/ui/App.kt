@@ -14,7 +14,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,8 +61,34 @@ fun App(controller: AppController, initialSheet: Sheet = Sheet.NONE, initialDeco
         val busy = phase !is Phase.Idle
         val actor = rememberWanderingPip(enabled = !busy && !decorating && sheet == Sheet.NONE)
 
+        // Keyboard: Esc closes whatever is open, Space opens the focus sheet (desktop-friendly).
+        val keyboard = remember { FocusRequester() }
+        LaunchedEffect(Unit) { runCatching { keyboard.requestFocus() } }
+
         Box(
-            Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Ink.bgTop, Ink.bgBottom))),
+            Modifier.fillMaxSize()
+                .focusRequester(keyboard)
+                .focusable()
+                .onPreviewKeyEvent { ev ->
+                    if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when {
+                        ev.key == Key.Escape -> {
+                            when {
+                                pickingSlot != null -> pickingSlot = null
+                                sheet != Sheet.NONE -> sheet = Sheet.NONE
+                                decorating -> decorating = false
+                                else -> return@onPreviewKeyEvent false
+                            }
+                            true
+                        }
+                        ev.key == Key.Spacebar && !busy && sheet == Sheet.NONE -> {
+                            sheet = Sheet.FOCUS
+                            true
+                        }
+                        else -> false
+                    }
+                }
+                .background(Brush.verticalGradient(listOf(Ink.bgTop, Ink.bgBottom))),
             contentAlignment = Alignment.TopCenter,
         ) {
             Column(

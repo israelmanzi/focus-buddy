@@ -37,6 +37,14 @@ Install the APK with `adb install -r composeApp-release.apk` or by opening it on
 Data is an append-only event log, so devices merge without conflicts; each device also works
 fully offline and catches up later. Backups (Settings → Backup) are plain JSON event logs.
 
+## Desktop specifics
+
+- Remembers window size and position; minimum 360×560.
+- Space opens the focus sheet, Esc closes whatever is open.
+- Optional keep-awake (Settings → Keep screen on) blocks idle sleep through logind while focusing.
+- Closing the window quits; a tray icon (where the desktop supports one) offers start/stop/open.
+- Session-finished and break-over notifications use the freedesktop notification service.
+
 ## Sounds
 
 All audio is synthesized at runtime (no asset files): a chime on start, a three-note finish, a
