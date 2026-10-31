@@ -63,15 +63,14 @@ class EventOrderingTest {
     }
 
     @Test
-    fun purchaseCannotSpendAcornsFromAnEventWithALaterTimestamp() {
-        // A device whose clock is behind stamps the buy before the earning session; the fold
-        // (by design, sorted by timestamp) then drops the purchase. This is deterministic on
-        // every device, but it is a UX bug - see the sync clock-skew test.
+    fun purchaseUsesTotalEarnedWhenClocksDisagree() {
+        // A device whose clock is behind stamps the buy before the earning session. Purchases are
+        // validated against everything earned, so clock skew cannot silently swallow a purchase.
         val earning = session(10_000, 125, device = "a")
         val buy = event(5_000, Payload.Buy("skin:mint"), device = "b")
         val state = GameState.fold(listOf(earning, buy))
-        assertFalse(state.owns("skin:mint"))
-        assertEquals(150, state.acorns)
+        assertTrue(state.owns("skin:mint"))
+        assertEquals(0, state.acorns)
     }
 
     @Test

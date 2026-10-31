@@ -207,7 +207,7 @@ class SyncSimulationTest {
      * device retries the same page and stays offline forever.
      */
     @Test
-    fun productBug_unknownPayloadTypeBlocksSyncPermanently() {
+    fun unknownPayloadTypesDoNotBlockSync() {
         val known = Event(
             id = "known-tag",
             device = "seed-device",
@@ -247,7 +247,7 @@ class SyncSimulationTest {
      * each keeps its own copy and they never converge, contradicting the event-log contract.
      */
     @Test
-    fun productBug_conflictingDuplicateIdsDivergePermanently() {
+    fun conflictingDuplicateIdsConverge() {
         val serverVersion = Event("dup-id", "seed-device", 1, Payload.Tag("from-server", "Server", 0xFF112233))
         store.sync(0, listOf("dup-id" to BuddyJson.encodeToString(Event.serializer(), serverVersion)), 100_000)
 
@@ -275,7 +275,7 @@ class SyncSimulationTest {
      * gone and the acorns are unspent.
      */
     @Test
-    fun productBug_clockSkewSilentlyDropsAnAffordablePurchase() {
+    fun purchaseSurvivesClockSkewBetweenDevices() {
         val fast = device(startMs = Harness.DEFAULT_START + 60 * 60_000L)
         val slow = device(startMs = Harness.DEFAULT_START)
         try {
@@ -286,12 +286,9 @@ class SyncSimulationTest {
 
             assertTrue(slow.controller.buy("skin:mint"), "the UI offered the purchase, so buy() must accept it")
             sync(slow, fast)
-            assertEquals(fast.state(), slow.state()) // both devices agree...
-            assertEquals(150, slow.state().acorns)    // ...but the acorns were not spent
-            assertTrue(
-                slow.state().owns("skin:mint"),
-                "BUG: buy() returned true and the item looked affordable, but clock skew made the fold drop the purchase",
-            )
+            assertEquals(fast.state(), slow.state()) // both devices agree
+            assertEquals(0, slow.state().acorns)      // the acorns were spent
+            assertTrue(slow.state().owns("skin:mint"), "clock skew must not swallow an accepted purchase")
         } finally {
             fast.close(); slow.close()
         }

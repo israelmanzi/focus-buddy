@@ -87,13 +87,39 @@ data class GameState(
             else copy(style = CompanionStyle(p.name.take(24).ifBlank { "Pip" }, p.skin, p.hat, p.neck, p.face))
         }
         is Payload.Tag -> copy(tags = tags + (p.tagId to TagInfo(p.tagId, p.name.take(24), p.color, p.archived)))
+        Payload.Unknown -> this
     }
 
     companion object {
-        val eventOrder = compareBy<Event>({ it.ts }, { it.id })
+        /**
+         * Events stamped in the same millisecond still need a causal order: money before spending,
+         * ownership before wearing. Payload type is a stable tie-break; the id settles the rest.
+         */
+        fun rank(e: Event): Int = when (e.payload) {
+            is Payload.Session -> 0
+            is Payload.Tag -> 1
+            is Payload.Buy -> 2
+            is Payload.Style -> 3
+            is Payload.Equip -> 4
+            Payload.Unknown -> 5
+        }
 
-        /** Deterministic: every device holding the same events reaches the same state. */
-        fun fold(events: Collection<Event>): GameState =
-            events.sortedWith(eventOrder).distinctBy { it.id }.fold(GameState()) { s, e -> s.apply(e) }
+        val eventOrder = compareBy<Event>({ it.ts }, { rank(it) }, { it.id })
+
+        /**
+         * Deterministic: every device holding the same events reaches the same state.
+         *
+         * Earnings are applied before anything else, so a purchase only depends on the total
+         * earned rather than on which device's clock was ahead when the events were stamped.
+         * Two events claiming one id are resolved by their canonical JSON, not by arrival order.
+         */
+        fun fold(events: Collection<Event>): GameState {
+            val ordered = events.sortedWith(eventOrder)
+            val ids = ordered.groupingBy { it.id }.eachCount()
+            val unique = if (ids.none { it.value > 1 }) ordered else
+                ordered.groupBy { it.id }.values.map { group -> group.minBy { it.canonical() } }.sortedWith(eventOrder)
+            val (earn, rest) = unique.partition { it.payload is Payload.Session }
+            return (earn + rest).fold(GameState()) { s, e -> s.apply(e) }
+        }
     }
 }

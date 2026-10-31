@@ -8,6 +8,7 @@ import buddy.app.sync.SyncClient
 import buddy.core.BuddyJson
 import buddy.core.Catalog
 import buddy.core.Event
+import buddy.core.canonical
 import buddy.core.GameState
 import buddy.core.Payload
 import buddy.core.Rules
@@ -54,6 +55,8 @@ class AppController(
 
     private val events = store.loadEvents().associateBy { it.id }.toMutableMap()
     private var meta: DeviceMeta = store.loadMeta()
+    /** Last timestamp this device stamped, so two actions in one millisecond keep their order. */
+    private var lastLocalTs: Long = events.values.filter { it.device == meta.deviceId }.maxOfOrNull { it.ts } ?: 0L
 
     private val _state = MutableStateFlow(GameState.fold(events.values))
     val state: StateFlow<GameState> = _state.asStateFlow()
@@ -261,7 +264,9 @@ class AppController(
         emit(Payload.Tag(id ?: UUID.randomUUID().toString().take(8), name, color, archived))
 
     private fun emit(p: Payload) {
-        val e = Event(UUID.randomUUID().toString(), meta.deviceId, clock(), p)
+        val ts = maxOf(clock(), lastLocalTs + 1)
+        lastLocalTs = ts
+        val e = Event(UUID.randomUUID().toString(), meta.deviceId, ts, p)
         events[e.id] = e
         // Persist the pending id before the event itself. If the process dies in between, the id
         // is pruned (no event on disk); the opposite order would leave a recorded event that is
@@ -300,8 +305,7 @@ class AppController(
                 // the server's body limit, and skip ids whose event never reached disk.
                 val sending = meta.pending.filter { it in events }.take(SYNC_BATCH_EVENTS).map { events.getValue(it) }
                 val res = syncClient.sync(s.syncUrl, s.syncToken, SyncRequest(cursor, sending))
-                val fresh = res.events.filter { it.id !in events }
-                fresh.forEach { events[it.id] = it }
+                val fresh = absorb(res.events)
                 // Publish each page before persisting it: a later failure must not leave the UI
                 // (and purchases) on a stale balance after some pages were merged.
                 if (fresh.isNotEmpty()) _state.value = GameState.fold(events.values)
@@ -334,12 +338,28 @@ class AppController(
         BuddyJson.encodeToString(ListSerializer(Event.serializer()), events.values.sortedWith(GameState.eventOrder))
 
     /** Merges a backup into the log (never deletes). Returns how many events were new. */
+    /**
+     * Adds new events and resolves id collisions deterministically (smaller canonical JSON wins),
+     * so two devices that saw different payloads for one id still converge.
+     * Returns the events that should be appended to the log.
+     */
+    private fun absorb(incoming: List<Event>): List<Event> {
+        val added = mutableListOf<Event>()
+        for (e in incoming) {
+            val cur = events[e.id]
+            when {
+                cur == null -> { events[e.id] = e; added += e }
+                cur != e && e.canonical() < cur.canonical() -> { events[e.id] = e; added += e }
+            }
+        }
+        return added
+    }
+
     fun importBackup(json: String): Int {
         // A hand-edited or duplicated backup must not append the same id twice: the in-memory
         // map would keep the last copy while the file keeps the first (and sync both).
-        val incoming = BuddyJson.decodeFromString(ListSerializer(Event.serializer()), json).distinctBy { it.id }
-        val fresh = incoming.filter { it.id !in events }
-        fresh.forEach { events[it.id] = it }
+        val incoming = BuddyJson.decodeFromString(ListSerializer(Event.serializer()), json)
+        val fresh = absorb(incoming)
         saveMeta(meta.copy(pending = (meta.pending + fresh.map { it.id }).distinct()))
         store.append(fresh)
         _state.value = GameState.fold(events.values)

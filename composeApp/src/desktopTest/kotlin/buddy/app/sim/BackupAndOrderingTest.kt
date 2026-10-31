@@ -12,8 +12,7 @@ import kotlin.test.assertTrue
 /**
  * Backup round trips, merges and event-ordering robustness.
  *
- * Tests whose name starts with `productBug_` are expected to fail until the product is fixed;
- * they encode the behaviour the app promises, not the behaviour it currently has.
+ * Some of these started life as failing reproductions; they now guard the fix.
  */
 class BackupAndOrderingTest {
 
@@ -131,7 +130,7 @@ class BackupAndOrderingTest {
     }
 
     @Test
-    fun productBug_duplicateIdsInsideOneBackupShouldBeCountedOnce() {
+    fun duplicateIdsInsideOneBackupAreCountedOnce() {
         Harness().use { h ->
             val e = h.session(25)
             val restored = h.controller.importBackup(Harness.encode(listOf(e, e)))
@@ -150,7 +149,7 @@ class BackupAndOrderingTest {
      * public API: buy an item, then immediately equip it (the slot picker does exactly this).
      */
     @Test
-    fun productBug_sameMillisecondBuyThenEquipCanLoseTheEquip() {
+    fun sameMillisecondBuyThenEquipKeepsTheEquip() {
         val missing = mutableListOf<Int>()
         repeat(24) { i ->
             val h = Harness()
@@ -171,7 +170,7 @@ class BackupAndOrderingTest {
     }
 
     @Test
-    fun productBug_sameTimestampEquipBeforeBuyIsIgnoredByTheFold() {
+    fun sameTimestampEquipAppliesAfterBuy() {
         val device = "device-a"
         val session = Event("00-session", device, 1_000, Payload.Session(0, 100 * 60_000L, 100, 100 * 60L, "focus", true))
         val buy = Event("zz-buy", device, 2_000, Payload.Buy(rugCozy))

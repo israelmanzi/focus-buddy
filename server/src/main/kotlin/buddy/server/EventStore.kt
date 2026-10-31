@@ -57,12 +57,26 @@ class EventStore(path: String) : AutoCloseable {
             var inserted = 0
             if (incoming.isNotEmpty()) {
                 val now = System.currentTimeMillis()
-                conn.prepareStatement("INSERT OR IGNORE INTO events(id, json, received_at) VALUES (?, ?, ?)").use { ps ->
-                    for ((id, json) in incoming) {
-                        ps.setString(1, id)
-                        ps.setString(2, json)
-                        ps.setLong(3, now)
-                        inserted += ps.executeUpdate()
+                conn.prepareStatement("SELECT json FROM events WHERE id = ?").use { find ->
+                    conn.prepareStatement("INSERT OR IGNORE INTO events(id, json, received_at) VALUES (?, ?, ?)").use { ps ->
+                        conn.prepareStatement("DELETE FROM events WHERE id = ?").use { del ->
+                            for ((id, json) in incoming) {
+                                find.setString(1, id)
+                                val stored = find.executeQuery().use { rs -> if (rs.next()) rs.getString(1) else null }
+                                // Two devices can claim one id with different payloads. Keep the
+                                // lexicographically smaller JSON on every replica: replace the row
+                                // (with a fresh seq) so clients learn the winner too.
+                                if (stored != null && json >= stored) continue
+                                if (stored != null) {
+                                    del.setString(1, id)
+                                    del.executeUpdate()
+                                }
+                                ps.setString(1, id)
+                                ps.setString(2, json)
+                                ps.setLong(3, now)
+                                inserted += ps.executeUpdate()
+                            }
+                        }
                     }
                 }
             }

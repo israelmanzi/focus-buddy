@@ -2,6 +2,7 @@ package buddy.app.data
 
 import buddy.core.BuddyJson
 import buddy.core.Event
+import buddy.core.canonical
 import kotlinx.serialization.Serializable
 import java.io.File
 import java.nio.file.Files
@@ -77,9 +78,12 @@ class Store(private val dir: File) {
 
     fun loadEvents(): List<Event> {
         if (!eventsFile.exists()) return emptyList()
-        return eventsFile.readLines().mapNotNull { line ->
+        val parsed = eventsFile.readLines().mapNotNull { line ->
             line.takeIf { it.isNotBlank() }?.let { runCatching { BuddyJson.decodeFromString(Event.serializer(), it) }.getOrNull() }
-        }.distinctBy { it.id }
+        }
+        return parsed.groupBy { it.id }.values.map { group ->
+            if (group.size == 1) group[0] else group.minBy { it.canonical() }
+        }
     }
 
     fun append(events: List<Event>) {

@@ -3,6 +3,8 @@ package buddy.core
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
 
 /** One immutable fact. The whole synced game state is a fold over these (see [GameState.fold]). */
 @Serializable
@@ -16,6 +18,11 @@ data class Event(
 
 @Serializable
 sealed interface Payload {
+
+    /** A payload written by a newer version. Stored and synced untouched, ignored by the fold. */
+    @Serializable
+    @SerialName("unknown")
+    data object Unknown : Payload
 
     /** A focus session ended, either completed or abandoned. Rewards are derived, not stored. */
     @Serializable
@@ -65,8 +72,15 @@ data class SyncResponse(
     val events: List<Event>,
 )
 
+/** Byte-stable form, used to pick one of two events that claim the same id. */
+fun Event.canonical(): String = BuddyJson.encodeToString(Event.serializer(), this)
+
 val BuddyJson = Json {
     ignoreUnknownKeys = true
     encodeDefaults = true
     classDiscriminator = "type"
+    // An unknown `type` decodes to Payload.Unknown instead of failing the whole sync page.
+    serializersModule = SerializersModule {
+        polymorphic(Payload::class) { defaultDeserializer { Payload.Unknown.serializer() } }
+    }
 }
