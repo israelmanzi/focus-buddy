@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import buddy.app.AppController
+import buddy.app.Strings
 import buddy.core.DayMark
 import buddy.core.Stats
 import buddy.core.StatsRange
@@ -43,9 +44,9 @@ fun StatsSheet(controller: AppController, onClose: () -> Unit) {
     var tab by remember { mutableStateOf(0) }
 
     SheetCard(onClose) {
-        Title("Focus stats")
+        Title(Strings.Stats.title)
         Spacer(Modifier.height(Space.md))
-        Tabs(listOf("Summary", "Day", "Week", "Month", "Year"), tab, { tab = it })
+        Tabs(Strings.Stats.tabs, tab, { tab = it })
         Spacer(Modifier.height(Space.lg))
         ScrollColumn(Modifier.weight(1f, fill = false)) {
             if (tab == 0) Summary(stats) else RangeView(controller, stats, StatsRange.entries[tab - 1])
@@ -57,7 +58,7 @@ fun StatsSheet(controller: AppController, onClose: () -> Unit) {
 
 @Composable
 private fun Summary(stats: Stats) {
-    Text("Last 28 days", style = label(Type.lead))
+    Text(Strings.Stats.last28Days, style = label(Type.lead))
     Spacer(Modifier.height(Space.sm))
     val days = stats.tracker()
     days.chunked(7).forEach { week ->
@@ -72,17 +73,17 @@ private fun Summary(stats: Stats) {
         }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(Space.xl), verticalAlignment = Alignment.CenterVertically) {
-        Legend(Ink.dayOff, "none"); Legend(Ink.leaf, "focus"); Legend(Ink.leafDark, "deep focus")
+        Legend(Ink.dayOff, Strings.Stats.legendNone); Legend(Ink.leaf, Strings.Stats.legendFocus); Legend(Ink.leafDark, Strings.Stats.legendDeep)
     }
     Spacer(Modifier.height(14.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(Space.lg)) {
-        StatBox("Focused", formatMinutes(stats.totalMinutes), Modifier.weight(1f))
-        StatBox("Sessions", "${stats.totalSessions}", Modifier.weight(1f))
+        StatBox(Strings.Stats.focused, formatMinutes(stats.totalMinutes), Modifier.weight(1f))
+        StatBox(Strings.Stats.sessions, "${stats.totalSessions}", Modifier.weight(1f))
     }
     Spacer(Modifier.height(Space.lg))
     Row(horizontalArrangement = Arrangement.spacedBy(Space.lg)) {
-        StatBox("Streak", "${stats.currentStreak} d", Modifier.weight(1f))
-        StatBox("Best streak", "${stats.bestStreak} d", Modifier.weight(1f))
+        StatBox(Strings.Stats.streak, Strings.Stats.days(stats.currentStreak), Modifier.weight(1f))
+        StatBox(Strings.Stats.bestStreak, Strings.Stats.days(stats.bestStreak), Modifier.weight(1f))
     }
 }
 
@@ -104,7 +105,7 @@ private fun StatBox(title: String, value: String, modifier: Modifier) {
 private fun RangeView(controller: AppController, stats: Stats, range: StatsRange) {
     val bars = stats.bars(range)
     val measurer = rememberTextMeasurer()
-    Text("Total: ${formatMinutes(stats.rangeTotal(range))}", style = label(Type.button))
+    Text(Strings.Stats.total(formatMinutes(stats.rangeTotal(range))), style = label(Type.button))
     Spacer(Modifier.height(Space.md))
     Canvas(Modifier.fillMaxWidth().aspectRatio(1.6f)) {
         val max = (bars.maxOfOrNull { it.minutes } ?: 0).coerceAtLeast(30)
@@ -131,7 +132,7 @@ private fun RangeView(controller: AppController, stats: Stats, range: StatsRange
     Spacer(Modifier.height(Space.xl))
     val tags = stats.byTag(range)
     val state = controller.state.value
-    if (tags.isEmpty()) Text("No focus sessions in this period yet.", style = label(Type.body, FontWeight.Medium, Ink.muted))
+    if (tags.isEmpty()) Text(Strings.Stats.empty, style = label(Type.body, FontWeight.Medium, Ink.muted))
     tags.forEach { (tag, min) ->
         val info = state.tags[tag]
         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {

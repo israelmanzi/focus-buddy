@@ -143,8 +143,8 @@ class FocusService : Service() {
                 return
             }
         }
-        appText.text = "${label(pkg)} can wait."
-        timeText.text = endsAt?.let { "${formatLeft(it - now)} left in this session" } ?: "Stay with Pip a little longer"
+        appText.text = Strings.Overlay.appCanWait(label(pkg))
+        timeText.text = endsAt?.let { Strings.Overlay.sessionLeft(formatLeft(it - now)) } ?: Strings.Overlay.stayLonger
     }
 
     private fun hideOverlay() {
@@ -164,7 +164,7 @@ class FocusService : Service() {
         appText = text(20f)
         timeText = text(18f)
         val button = TextView(this).apply {
-            text = "Back to Focus Buddy"
+            text = Strings.Overlay.backToApp
             setTextColor(CREAM)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             setTypeface(typeface, android.graphics.Typeface.BOLD)
@@ -179,7 +179,7 @@ class FocusService : Service() {
             gravity = Gravity.CENTER
             setBackgroundColor(CREAM)
             setPadding(dp(32), dp(32), dp(32), dp(32))
-            addView(text(34f, bold = true).apply { text = "Pip is focusing" })
+            addView(text(34f, bold = true).apply { text = Strings.Overlay.focusing })
             addView(appText)
             addView(timeText)
             addView(button, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(32) })

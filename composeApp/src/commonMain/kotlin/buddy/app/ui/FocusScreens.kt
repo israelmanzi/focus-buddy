@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import buddy.app.AppController
 import buddy.app.Phase
+import buddy.app.Strings
 import buddy.app.art.Mood
 import buddy.app.art.PipView
 import buddy.app.data.RunningSession
@@ -86,7 +87,7 @@ fun FocusSetup(controller: AppController, onClose: () -> Unit) {
                     style = label(Type.clockSetup, FontWeight.Black, Ink.onSelected),
                 )
                 Text(
-                    if (countUp) "stopwatch" else if (minutes >= 60) "hours : minutes" else "minutes",
+                    if (countUp) Strings.Focus.stopwatch else if (minutes >= 60) Strings.Focus.hoursMinutes else Strings.Focus.minutes,
                     style = label(Type.small, color = Ink.onSelected),
                 )
                 if (!countUp) {
@@ -105,7 +106,7 @@ fun FocusSetup(controller: AppController, onClose: () -> Unit) {
                         RoundStep("+") { minutes = (minutes + Rules.STEP_MINUTES).coerceAtMost(Rules.MAX_MINUTES.toFloat()) }
                     }
                 }
-                Tabs(listOf("Countdown", "Stopwatch"), if (countUp) 1 else 0, { countUp = it == 1 }, Modifier.padding(top = Space.md))
+                Tabs(listOf(Strings.Focus.countdown, Strings.Focus.stopwatchTab), if (countUp) 1 else 0, { countUp = it == 1 }, Modifier.padding(top = Space.md))
             }
             Spacer(Modifier.height(Space.xl))
             // tags
@@ -114,17 +115,17 @@ fun FocusSetup(controller: AppController, onClose: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(Space.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Tag", style = label(Type.body))
+                Text(Strings.Focus.tag, style = label(Type.body))
                 state.tags.values.filter { !it.archived }.forEach { t ->
                     Chip(t.name, Color(t.color), selected = t.id == tag) { tag = t.id }
                 }
-                if (newTag == null) Chip("+ new", Ink.paperDeep, false) { newTag = "" }
+                if (newTag == null) Chip(Strings.Focus.newTag, Ink.paperDeep, false) { newTag = "" }
             }
             newTag?.let { nt ->
                 Row(Modifier.padding(top = Space.md), verticalAlignment = Alignment.CenterVertically) {
-                    TextInput(nt, { newTag = it.take(24) }, "Tag name", Modifier.weight(1f))
+                    TextInput(nt, { newTag = it.take(24) }, Strings.Focus.tagHint, Modifier.weight(1f))
                     Spacer(Modifier.width(Space.md))
-                    ChunkyButton("Add", fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md), enabled = nt.isNotBlank()) {
+                    ChunkyButton(Strings.Focus.add, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md), enabled = nt.isNotBlank()) {
                         val color = tagColors[state.tags.size % tagColors.size]
                         controller.upsertTag(null, nt.trim(), color)
                         newTag = null
@@ -135,20 +136,20 @@ fun FocusSetup(controller: AppController, onClose: () -> Unit) {
             if (p.supportsDeepFocus) {
                 Row(Modifier.fillMaxWidth().padding(top = Space.lg), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Deep Focus", style = label(Type.lead))
+                        Text(Strings.Focus.deepFocus, style = label(Type.lead))
                         Text(
                             when {
-                                !deep -> "Leaving the app ends the session after ${settings.graceSec}s"
-                                !p.deepFocusReady() -> "Needs permissions. Tap Set up"
-                                settings.packages.isEmpty() -> "No apps chosen yet (Settings)"
-                                settings.allowMode -> "Only ${settings.packages.size} allowed apps"
-                                else -> "Blocks ${settings.packages.size} apps"
+                                !deep -> Strings.Focus.leaveWarning(settings.graceSec)
+                                !p.deepFocusReady() -> Strings.Focus.needsPermissions
+                                settings.packages.isEmpty() -> Strings.Focus.noApps
+                                settings.allowMode -> Strings.Focus.onlyApps(settings.packages.size)
+                                else -> Strings.Focus.blocksApps(settings.packages.size)
                             },
                             style = label(Type.foot, FontWeight.Normal, Ink.muted),
                         )
                     }
                     if (deep && !p.deepFocusReady()) {
-                        ChunkyButton("Set up", fontSize = Type.small, padding = PaddingValues(Space.lg, Space.sm)) { p.requestDeepFocusPermissions() }
+                        ChunkyButton(Strings.Focus.setUp, fontSize = Type.small, padding = PaddingValues(Space.lg, Space.sm)) { p.requestDeepFocusPermissions() }
                         Spacer(Modifier.width(Space.md))
                     }
                     BuddySwitch(deep) { deep = it }
@@ -156,8 +157,8 @@ fun FocusSetup(controller: AppController, onClose: () -> Unit) {
             }
             Spacer(Modifier.height(Space.xxl))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.xl), verticalAlignment = Alignment.CenterVertically) {
-                ChunkyButton("Back", color = Ink.berry, textColor = Ink.onSelected, fontSize = Type.bodyLarge) { onClose() }
-                ChunkyButton("Start", color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.titleLarge) {
+                ChunkyButton(Strings.Focus.back, color = Ink.berry, textColor = Ink.onSelected, fontSize = Type.bodyLarge) { onClose() }
+                ChunkyButton(Strings.Focus.start, color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.titleLarge) {
                     controller.startSession(minutes.toInt(), countUp, tag, deep && p.deepFocusReady())
                     onClose()
                 }
@@ -183,7 +184,7 @@ fun RunningScreen(controller: AppController, phase: Phase.Running) {
             tagInfo?.let { Chip(it.name, Color(it.color), true) {} }
             Spacer(Modifier.height(Space.lg))
             RunningClock(rs, now)
-            if (rs.deepFocus) Text("Deep Focus on", style = label(Type.small, color = Ink.butter))
+            if (rs.deepFocus) Text(Strings.Session.deepFocusOn, style = label(Type.small, color = Ink.butter))
             Spacer(Modifier.height(Space.xxxl))
             RunningStop(controller, rs, now)
             Spacer(Modifier.height(Space.xxxl))
@@ -195,8 +196,8 @@ fun RunningScreen(controller: AppController, phase: Phase.Running) {
 private fun RunningHint(rs: RunningSession, now: State<Long>) {
     val elapsed = (now.value - rs.startedAt) / 1000
     Text(
-        if (rs.awaySince != null) "Come back… I'm waiting!"
-        else listOf("Shh… reading time.", "We've got this.", "Page by page…")[((elapsed / 20) % 3).toInt()],
+        if (rs.awaySince != null) Strings.Session.away
+        else Strings.Session.readingLines[((elapsed / 20) % 3).toInt()],
         style = label(Type.button, color = Ink.paper), textAlign = TextAlign.Center,
     )
 }
@@ -213,9 +214,9 @@ private fun RunningStop(controller: AppController, rs: RunningSession, now: Stat
     val elapsed = (now.value - rs.startedAt) / 1000
     val freeLeft = controller.freeCancelLeft(rs)
     when {
-        freeLeft > 0 -> ChunkyButton("Cancel ($freeLeft)", color = Ink.paperDeep) { controller.stopSession() }
+        freeLeft > 0 -> ChunkyButton(Strings.Session.cancel(freeLeft), color = Ink.paperDeep) { controller.stopSession() }
         rs.countUp -> ChunkyButton(
-            if (elapsed >= Rules.MIN_MINUTES * 60) "Done!" else "Stop (under ${Rules.MIN_MINUTES} min earns nothing)",
+            if (elapsed >= Rules.MIN_MINUTES * 60) Strings.Session.done else Strings.Session.stopCountUp(Rules.MIN_MINUTES),
             color = Ink.leaf, textColor = Ink.onSelected,
             fontSize = if (elapsed >= Rules.MIN_MINUTES * 60) Type.heading else Type.body,
         ) { controller.stopSession() }
@@ -226,10 +227,10 @@ private fun RunningStop(controller: AppController, rs: RunningSession, now: Stat
 @Composable
 private fun GiveUpButton(onConfirm: () -> Unit) {
     var confirming by remember { mutableStateOf(false) }
-    if (!confirming) ChunkyButton("Stop focusing", color = Ink.berry, textColor = Ink.onSelected) { confirming = true }
+    if (!confirming) ChunkyButton(Strings.Session.stopFocusing, color = Ink.berry, textColor = Ink.onSelected) { confirming = true }
     else Row(horizontalArrangement = Arrangement.spacedBy(Space.lg), verticalAlignment = Alignment.CenterVertically) {
-        ChunkyButton("Keep going", color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.bodyLarge) { confirming = false }
-        ChunkyButton("Give up", color = Ink.berry, textColor = Ink.onSelected, fontSize = Type.bodyLarge) { onConfirm() }
+        ChunkyButton(Strings.Session.keepGoing, color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.bodyLarge) { confirming = false }
+        ChunkyButton(Strings.Session.giveUp, color = Ink.berry, textColor = Ink.onSelected, fontSize = Type.bodyLarge) { onConfirm() }
     }
 }
 
@@ -239,15 +240,15 @@ fun RewardCard(controller: AppController, phase: Phase.Rewarded) {
     SheetCard(null, maxWidth = Sizes.dialogWidth, outerPadding = Space.xxxl) {
         ScrollColumn {
             PipView(state.style, Mood.HAPPY, Modifier.size(160.dp, 150.dp))
-            Title("We did it!")
-            Text("${formatMinutes(phase.minutes)} of focus", style = label(Type.lead, FontWeight.Medium, Ink.muted))
+            Title(Strings.Session.rewardTitle)
+            Text(Strings.Session.focusOf(formatMinutes(phase.minutes)), style = label(Type.lead, FontWeight.Medium, Ink.muted))
             Spacer(Modifier.height(Space.xl))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("+", style = label(28.sp, FontWeight.Black, Ink.acorn))
                 AcornCount(phase.acorns, big = true)
             }
             Spacer(Modifier.height(Space.xxl))
-            ChunkyButton("Yay!", color = Ink.leaf, textColor = Ink.onSelected) { controller.dismissResult() }
+            ChunkyButton(Strings.Session.rewardButton, color = Ink.leaf, textColor = Ink.onSelected) { controller.dismissResult() }
         }
     }
 }
@@ -258,14 +259,14 @@ fun InterruptedCard(controller: AppController, phase: Phase.Interrupted) {
     SheetCard(null, maxWidth = Sizes.dialogWidth, outerPadding = Space.xxxl) {
         ScrollColumn {
             PipView(state.style, Mood.SAD, Modifier.size(160.dp, 150.dp))
-            Title("Oh no…")
+            Title(Strings.Session.interruptedTitle)
             Text(
-                if (phase.focusedMin > 0) "We focused for ${formatMinutes(phase.focusedMin)}, but the session ended early. No acorns this time. Shall we try again?"
-                else "The session ended before it really started. Let's try again?",
+                if (phase.focusedMin > 0) Strings.Session.interruptedFocused(formatMinutes(phase.focusedMin))
+                else Strings.Session.interruptedEarly,
                 style = label(Type.lead, FontWeight.Medium, Ink.muted), textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(Space.xxl))
-            ChunkyButton("Okay", color = Ink.butter) { controller.dismissResult() }
+            ChunkyButton(Strings.Session.okay, color = Ink.butter) { controller.dismissResult() }
         }
     }
 }
@@ -277,12 +278,12 @@ fun BreakOffer(controller: AppController) {
     SheetCard(null, maxWidth = Sizes.dialogWidth, outerPadding = Space.xxxl) {
         ScrollColumn {
             PipView(state.style, Mood.BREAK, Modifier.size(140.dp, 130.dp))
-            Title("Tea break?", Type.titleLarge)
+            Title(Strings.Session.breakTitle, Type.titleLarge)
             Spacer(Modifier.height(Space.xl))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
                 listOf(5, 10, 15).forEach { m ->
                     ChunkyButton(
-                        "$m min",
+                        Strings.Session.breakMinutes(m),
                         color = if (m == settings.breakMinutes) Ink.leaf else Ink.butter,
                         textColor = if (m == settings.breakMinutes) Ink.onSelected else Ink.outline,
                         fontSize = Type.bodyLarge,
@@ -290,7 +291,7 @@ fun BreakOffer(controller: AppController) {
                 }
             }
             Spacer(Modifier.height(Space.lg))
-            Text("No thanks", style = label(Type.lead, color = Ink.muted), modifier = Modifier.tap { controller.dismissResult() }.padding(Space.md))
+            Text(Strings.Session.noThanks, style = label(Type.lead, color = Ink.muted), modifier = Modifier.tap { controller.dismissResult() }.padding(Space.md))
         }
     }
 }
@@ -302,13 +303,13 @@ fun BreakScreen(controller: AppController, phase: Phase.OnBreak) {
     Box(Modifier.fillMaxSize().background(Ink.bgBottom)) {
         Column(Modifier.fillMaxSize().safeDrawingPadding().padding(Space.xxxl), horizontalAlignment = Alignment.CenterHorizontally) {
             Spacer(Modifier.height(Space.xxxl))
-            Text("Break time. Stretch, sip, breathe.", style = label(Type.button), textAlign = TextAlign.Center)
+            Text(Strings.Session.breakBody, style = label(Type.button), textAlign = TextAlign.Center)
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 PipView(state.style, Mood.BREAK, Modifier.size(240.dp, 240.dp))
             }
             BreakClock(phase, now)
             Spacer(Modifier.height(Space.xxxl))
-            ChunkyButton("End break", color = Ink.butter) { controller.endBreak() }
+            ChunkyButton(Strings.Session.endBreak, color = Ink.butter) { controller.endBreak() }
             Spacer(Modifier.height(Space.xxxl))
         }
     }

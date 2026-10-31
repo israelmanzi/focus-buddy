@@ -21,9 +21,9 @@ internal object Notify {
 
     fun createChannels(ctx: Context) {
         ctx.getSystemService(NotificationManager::class.java).createNotificationChannels(listOf(
-            NotificationChannel(CH_SESSION, "Focus session", NotificationManager.IMPORTANCE_LOW),
-            NotificationChannel(CH_NUDGE, "Come-back reminders", NotificationManager.IMPORTANCE_HIGH),
-            NotificationChannel(CH_BREAK, "Break reminders", NotificationManager.IMPORTANCE_HIGH),
+            NotificationChannel(CH_SESSION, Strings.Notifications.sessionChannel, NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(CH_NUDGE, Strings.Notifications.nudgeChannel, NotificationManager.IMPORTANCE_HIGH),
+            NotificationChannel(CH_BREAK, Strings.Notifications.breakChannel, NotificationManager.IMPORTANCE_HIGH),
         ))
     }
 
@@ -39,8 +39,8 @@ internal object Notify {
 
     /** Ongoing session notification: counts down to [endsAt], or up from [startedAt] when there is no end. */
     fun session(ctx: Context, endsAt: Long?, startedAt: Long) = builder(ctx, CH_SESSION)
-        .setContentTitle("Pip is focusing")
-        .setContentText(if (endsAt == null) "Focusing with Pip" else "Stay with Pip until the timer ends")
+        .setContentTitle(Strings.Notifications.sessionTitle)
+        .setContentText(if (endsAt == null) Strings.Notifications.sessionBodyOpen else Strings.Notifications.sessionBodyTimed)
         .setOngoing(true)
         .setShowWhen(true)
         .setUsesChronometer(true)
@@ -50,8 +50,8 @@ internal object Notify {
         .build()
 
     fun nudge(ctx: Context, deadline: Long) = post(ctx, ID_NUDGE, builder(ctx, CH_NUDGE)
-        .setContentTitle("Come back! Pip is waiting")
-        .setContentText("Return before the timer runs out to keep your session")
+        .setContentTitle(Strings.Notifications.nudgeTitle)
+        .setContentText(Strings.Notifications.nudgeBody)
         .setPriority(NotificationCompat.PRIORITY_HIGH)
         .setCategory(NotificationCompat.CATEGORY_REMINDER)
         .setShowWhen(true)
@@ -63,8 +63,8 @@ internal object Notify {
         .build())
 
     fun breakOver(ctx: Context) = post(ctx, ID_BREAK, builder(ctx, CH_BREAK)
-        .setContentTitle("Break's over. Ready to focus?")
-        .setContentText("Pip is ready when you are.")
+        .setContentTitle(Strings.Notifications.breakTitle)
+        .setContentText(Strings.Notifications.breakBody)
         .setPriority(NotificationCompat.PRIORITY_HIGH)
         .setCategory(NotificationCompat.CATEGORY_REMINDER)
         .setOnlyAlertOnce(true)

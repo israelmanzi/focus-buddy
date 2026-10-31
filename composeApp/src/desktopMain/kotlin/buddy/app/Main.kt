@@ -37,7 +37,7 @@ object DesktopPlatform : Platform {
         runCatching {
             val icon = File(System.getProperty("user.home"), ".local/share/focus-buddy-app/icon.png")
             val cmd = buildList {
-                add("notify-send"); add("-a"); add("Focus Buddy"); add("-t"); add("8000")
+                add("notify-send"); add("-a"); add(Strings.About.appName); add("-t"); add("8000")
                 if (icon.exists()) { add("-i"); add(icon.path) }
                 add(title); add(body)
             }
@@ -172,7 +172,7 @@ fun main() {
         Window(
             onCloseRequest = { closeWindow() },
             state = windowState,
-            title = "Focus Buddy",
+            title = Strings.About.appName,
         ) {
             LaunchedEffect(Unit) {
                 awtWindow = window
