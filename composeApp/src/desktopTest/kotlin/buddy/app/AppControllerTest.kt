@@ -75,7 +75,8 @@ class AppControllerTest {
     @Test
     fun abandonsSessionWhoseGraceRanOutWhileDead() {
         val started = 1_000_000L
-        val away = started + 100_000L
+        // 200 s of a 25 minute plan is over the 10 % discard threshold.
+        val away = started + 200_000L
         Store(dir).saveMeta(
             DeviceMeta("dev", running = RunningSession(started, 25, false, Rules.DEFAULT_TAG, false, awaySince = away)),
         )
@@ -84,7 +85,7 @@ class AppControllerTest {
         val rec = c.state.value.sessions.single()
         assertEquals(false, rec.session.completed)
         assertEquals(away, rec.session.endedAt)
-        assertEquals(100L, rec.session.focusedSec)
+        assertEquals(200L, rec.session.focusedSec)
         assertEquals(0, c.state.value.acorns)
         assertTrue(c.phase.value is Phase.Interrupted)
     }

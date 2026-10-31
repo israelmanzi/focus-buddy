@@ -191,6 +191,12 @@ class AppController(
 
     private fun finish(rs: RunningSession, endedAt: Long, completed: Boolean) {
         val sec = ((endedAt - rs.startedAt) / 1000).coerceAtLeast(0)
+        // Abandoning before 10 % of the planned time leaves no trace: no sad card, no stats entry.
+        if (!completed && rs.plannedMin > 0 && sec * 10 < rs.plannedMin * 60L) {
+            endSession(rs, null)
+            _phase.value = Phase.Idle
+            return
+        }
         val session = Payload.Session(rs.startedAt, endedAt, rs.plannedMin, sec, rs.tag, completed, rs.deepFocus)
         val reward = Rules.reward(session)
         endSession(rs, session)

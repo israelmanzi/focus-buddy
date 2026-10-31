@@ -92,22 +92,34 @@ class SessionScenarioTest {
     }
 
     @Test
-    fun afterFreeWindowGivingUpRecordsAbandonedSession() {
+    fun givingUpBeforeTenPercentLeavesNoTrace() {
         Harness().use { h ->
             h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
             h.advance(11_000)
             assertEquals(0, h.controller.freeCancelLeft((h.phase() as Phase.Running).session))
             h.controller.stopSession()
 
+            assertIs<Phase.Idle>(h.phase())
+            assertEquals(0, h.state().acorns)
+            assertTrue(h.state().sessions.isEmpty())
+            assertEquals(0, stats(h).abandoned)
+        }
+    }
+
+    @Test
+    fun givingUpAfterTenPercentRecordsAnAbandonedSession() {
+        Harness().use { h ->
+            // 10 % of 25 minutes is 150 s.
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.advance(200_000)
+            h.controller.stopSession()
+
             val interrupted = assertIs<Phase.Interrupted>(h.phase())
-            assertEquals(0, interrupted.focusedMin)
+            assertEquals(3, interrupted.focusedMin)
             assertEquals(0, h.state().acorns)
             assertEquals(1, h.state().sessions.size)
-            val recorded = h.state().sessions.single().session
-            assertFalse(recorded.completed)
-            assertEquals(11L, recorded.focusedSec)
+            assertFalse(h.state().sessions.single().session.completed)
             assertEquals(1, stats(h).abandoned)
-            assertEquals(0, stats(h).totalSessions)
         }
     }
 
@@ -118,9 +130,9 @@ class SessionScenarioTest {
             h.advance(10_000)
             assertEquals(0, h.controller.freeCancelLeft((h.phase() as Phase.Running).session))
             h.controller.stopSession()
-            assertIs<Phase.Interrupted>(h.phase())
-            assertEquals(1, h.state().sessions.size)
-            assertFalse(h.state().sessions.single().session.completed)
+            // Ten seconds of a 25 minute plan is under 10 %, so nothing is recorded.
+            assertIs<Phase.Idle>(h.phase())
+            assertTrue(h.state().sessions.isEmpty())
         }
     }
 
@@ -172,13 +184,9 @@ class SessionScenarioTest {
             assertEquals(h.clock.now + 20_000, nudge.arg)
 
             h.advance(20_000)
-            val interrupted = assertIs<Phase.Interrupted>(h.phase())
-            assertEquals(1, interrupted.focusedMin)
-            assertEquals(1, h.state().sessions.size)
-            val recorded = h.state().sessions.single().session
-            assertFalse(recorded.completed)
-            assertEquals(60L, recorded.focusedSec)
-            assertEquals(1, stats(h).abandoned)
+            // 60 s is far below 10 % of the plan, so the abandon is discarded.
+            assertIs<Phase.Idle>(h.phase())
+            assertEquals(0, h.state().sessions.size)
         }
     }
 
@@ -209,12 +217,11 @@ class SessionScenarioTest {
             h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
             h.advance(60_000)
             h.controller.onAppBackgrounded()
-            h.advance(21_000) // ticker already abandoned at 20 s
-            assertIs<Phase.Interrupted>(h.phase())
+            h.advance(21_000) // ticker already abandoned at 20 s; under 10 % so it is discarded
+            assertIs<Phase.Idle>(h.phase())
 
             h.controller.onAppForegrounded()
-            assertIs<Phase.Interrupted>(h.phase())
-            assertEquals(1, h.state().sessions.size)
+            assertTrue(h.state().sessions.isEmpty())
         }
     }
 

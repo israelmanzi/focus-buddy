@@ -104,7 +104,7 @@ class UiSmokeTest {
         }
         shot("interrupted") { h ->
             h.controller.startSession(25, countUp = false, tag = "focus", deepFocus = false)
-            h.advance(11_000)
+            h.advance(200_000) // past 10 % of 25 minutes, so the abandon is kept
             h.controller.stopSession()
             assertTrue(h.phase() is Phase.Interrupted)
         }
