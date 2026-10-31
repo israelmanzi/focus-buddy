@@ -64,6 +64,11 @@ class RoomGeometry(val size: Size) {
     val right = Offset(center.x + halfW, center.y)
     val front = Offset(center.x, center.y + halfH)
 
+    private val shells = HashMap<String, RoomShellArt>()
+
+    /** The static shell paths/segments for [roomId], built once per geometry. */
+    internal fun shell(roomId: String): RoomShellArt = shells.getOrPut(roomId) { RoomShellArt(this, roomId) }
+
     /** i: back→right edge, j: back→left edge, both 0..1. */
     fun floor(i: Float, j: Float) = Offset(back.x + i * (right.x - back.x) + j * (left.x - back.x), back.y + i * (right.y - back.y) + j * (left.y - back.y))
 
@@ -94,72 +99,133 @@ class RoomGeometry(val size: Size) {
     }
 }
 
-fun DrawScope.drawRoomShell(g: RoomGeometry, roomId: String) {
-    val p = roomPalette(roomId)
-    val sw = g.w * 0.008f
-    val top = { o: Offset -> Offset(o.x, o.y - g.wallH) }
-    val leftWall = Path().apply { moveTo(g.left.x, g.left.y); lineTo(g.back.x, g.back.y); lineTo(top(g.back).x, top(g.back).y); lineTo(top(g.left).x, top(g.left).y); close() }
-    val rightWall = Path().apply { moveTo(g.back.x, g.back.y); lineTo(g.right.x, g.right.y); lineTo(top(g.right).x, top(g.right).y); lineTo(top(g.back).x, top(g.back).y); close() }
-    val floor = Path().apply { moveTo(g.back.x, g.back.y); lineTo(g.right.x, g.right.y); lineTo(g.front.x, g.front.y); lineTo(g.left.x, g.left.y); close() }
+/**
+ * Static parts of a room shell. Paths and floor-line endpoints are built once; [drawRoomShell]
+ * then only issues draw calls, so the animated home screen allocates nothing per frame here.
+ */
+internal class RoomShellArt(g: RoomGeometry, roomId: String) {
+    val palette = roomPalette(roomId)
+    private val outdoor = palette.outdoor
+    private val top = { o: Offset -> Offset(o.x, o.y - g.wallH) }
 
-    // floor slab thickness
-    val slab = g.w * 0.025f
-    val slabPath = Path().apply {
-        moveTo(g.left.x, g.left.y); lineTo(g.front.x, g.front.y); lineTo(g.right.x, g.right.y)
-        lineTo(g.right.x, g.right.y + slab); lineTo(g.front.x, g.front.y + slab); lineTo(g.left.x, g.left.y + slab); close()
+    val leftWall: Path = Path().apply {
+        moveTo(g.left.x, g.left.y); lineTo(g.back.x, g.back.y); lineTo(top(g.back).x, top(g.back).y); lineTo(top(g.left).x, top(g.left).y); close()
     }
-    drawPath(slabPath, p.trim)
-    drawPath(slabPath, OUTLINE, style = Stroke(sw))
+    val rightWall: Path = Path().apply {
+        moveTo(g.back.x, g.back.y); lineTo(g.right.x, g.right.y); lineTo(top(g.right).x, top(g.right).y); lineTo(top(g.back).x, top(g.back).y); close()
+    }
+    val floor: Path = Path().apply {
+        moveTo(g.back.x, g.back.y); lineTo(g.right.x, g.right.y); lineTo(g.front.x, g.front.y); lineTo(g.left.x, g.left.y); close()
+    }
+    val slab: Path = Path().apply {
+        val s = g.w * 0.025f
+        moveTo(g.left.x, g.left.y); lineTo(g.front.x, g.front.y); lineTo(g.right.x, g.right.y)
+        lineTo(g.right.x, g.right.y + s); lineTo(g.front.x, g.front.y + s); lineTo(g.left.x, g.left.y + s); close()
+    }
 
-    if (p.outdoor) {
-        // low fence instead of walls
+    /** Posts (base) and rails for the garden porch, in draw order. */
+    val fencePosts: List<Offset> = if (!outdoor) emptyList() else buildList {
         for (wall in listOf(true, false)) {
             val end = if (wall) g.left else g.right
             for (k in 0..8) {
                 val f = k / 8f
-                val b = Offset(g.back.x + (end.x - g.back.x) * f, g.back.y + (end.y - g.back.y) * f)
-                drawLine(p.leftWall, b, Offset(b.x, b.y - g.wallH * 0.35f), sw * 3.5f)
-                drawLine(OUTLINE, b, Offset(b.x, b.y - g.wallH * 0.35f), sw * 0.6f)
-            }
-            val rail = { h: Float -> drawLine(p.rightWall, Offset(g.back.x, g.back.y - g.wallH * h), Offset(end.x, end.y - g.wallH * h), sw * 2.5f) }
-            rail(0.12f); rail(0.28f)
-        }
-    } else {
-        drawPath(leftWall, p.leftWall)
-        drawPath(rightWall, p.rightWall)
-        // subtle wallpaper dots
-        for (k in 0..5) for (m in 1..4) {
-            for (lw in listOf(true, false)) {
-                val pt = g.wall(lw, (k + 0.5f) / 6f, m / 5f)
-                drawCircle(OUTLINE.copy(alpha = 0.06f), g.w * 0.006f, pt)
+                add(Offset(g.back.x + (end.x - g.back.x) * f, g.back.y + (end.y - g.back.y) * f))
             }
         }
-        // baseboards
-        drawLine(p.trim, Offset(g.left.x, g.left.y - sw * 2), Offset(g.back.x, g.back.y - sw * 2), sw * 3)
-        drawLine(p.trim, Offset(g.back.x, g.back.y - sw * 2), Offset(g.right.x, g.right.y - sw * 2), sw * 3)
-        drawPath(leftWall, OUTLINE, style = Stroke(sw))
-        drawPath(rightWall, OUTLINE, style = Stroke(sw))
-        // top trim
-        drawLine(p.trim, top(g.left), top(g.back), sw * 2.5f)
-        drawLine(p.trim, top(g.back), top(g.right), sw * 2.5f)
     }
-
-    drawPath(floor, p.floor)
-    clipPath(floor) {
-        // planks running back→left
+    val fenceRails: List<Pair<Offset, Offset>> = if (!outdoor) emptyList() else buildList {
+        for (wall in listOf(true, false)) {
+            val end = if (wall) g.left else g.right
+            for (h in listOf(0.12f, 0.28f)) {
+                add(Offset(g.back.x, g.back.y - g.wallH * h) to Offset(end.x, end.y - g.wallH * h))
+            }
+        }
+    }
+    val wallDots: List<Offset> = if (outdoor) emptyList() else buildList {
+        for (k in 0..5) for (m in 1..4) {
+            for (lw in listOf(true, false)) add(g.wall(lw, (k + 0.5f) / 6f, m / 5f))
+        }
+    }
+    val planks: List<Pair<Offset, Offset>> = buildList {
         for (k in 1..11) {
             val f = k / 12f
-            val a = g.floor(f, 0f); val b = g.floor(f, 1f)
-            drawLine(p.floorLine, a, b, sw * 0.7f)
+            add(g.floor(f, 0f) to g.floor(f, 1f))
         }
+    }
+    val ticks: List<Pair<Offset, Offset>> = buildList {
         for (k in 0..11) for (m in 0..3) {
             val f = (k + 0.5f) / 12f
             val j = (m + (k % 2) * 0.5f) / 4f + 0.12f
-            drawLine(p.floorLine, g.floor(f - 0.04f, j), g.floor(f + 0.04f, j), sw * 0.6f)
+            add(g.floor(f - 0.04f, j) to g.floor(f + 0.04f, j))
         }
     }
-    drawPath(floor, OUTLINE, style = Stroke(sw))
+    val baseboardLeft = g.left.copy(y = g.left.y - g.w * 0.016f) to g.back.copy(y = g.back.y - g.w * 0.016f)
+    val baseboardRight = g.back.copy(y = g.back.y - g.w * 0.016f) to g.right.copy(y = g.right.y - g.w * 0.016f)
+    val topTrimLeft = top(g.left) to top(g.back)
+    val topTrimRight = top(g.back) to top(g.right)
+    val strokeWidth = g.w * 0.008f
+    val outlineStroke = Stroke(strokeWidth)
 }
+
+fun DrawScope.drawRoomShell(g: RoomGeometry, roomId: String) {
+    val a = g.shell(roomId)
+    val p = a.palette
+    val sw = a.strokeWidth
+    val outline = OUTLINE
+
+    drawPath(a.slab, p.trim)
+    drawPath(a.slab, outline, style = a.outlineStroke)
+
+    if (p.outdoor) {
+        var i = 0
+        while (i < a.fencePosts.size) {
+            val b = a.fencePosts[i]
+            val t = Offset(b.x, b.y - g.wallH * 0.35f)
+            drawLine(p.leftWall, b, t, sw * 3.5f)
+            drawLine(outline, b, t, sw * 0.6f)
+            i++
+        }
+        i = 0
+        while (i < a.fenceRails.size) {
+            val (from, to) = a.fenceRails[i]
+            drawLine(p.rightWall, from, to, sw * 2.5f)
+            i++
+        }
+    } else {
+        drawPath(a.leftWall, p.leftWall)
+        drawPath(a.rightWall, p.rightWall)
+        val dotColor = outline.copy(alpha = 0.06f)
+        var i = 0
+        while (i < a.wallDots.size) {
+            drawCircle(dotColor, g.w * 0.006f, a.wallDots[i])
+            i++
+        }
+        drawLine(p.trim, a.baseboardLeft.first, a.baseboardLeft.second, sw * 3)
+        drawLine(p.trim, a.baseboardRight.first, a.baseboardRight.second, sw * 3)
+        drawPath(a.leftWall, outline, style = a.outlineStroke)
+        drawPath(a.rightWall, outline, style = a.outlineStroke)
+        drawLine(p.trim, a.topTrimLeft.first, a.topTrimLeft.second, sw * 2.5f)
+        drawLine(p.trim, a.topTrimRight.first, a.topTrimRight.second, sw * 2.5f)
+    }
+
+    drawPath(a.floor, p.floor)
+    clipPath(a.floor) {
+        var i = 0
+        while (i < a.planks.size) {
+            val (from, to) = a.planks[i]
+            drawLine(p.floorLine, from, to, sw * 0.7f)
+            i++
+        }
+        i = 0
+        while (i < a.ticks.size) {
+            val (from, to) = a.ticks[i]
+            drawLine(p.floorLine, from, to, sw * 0.6f)
+            i++
+        }
+    }
+    drawPath(a.floor, outline, style = a.outlineStroke)
+}
+
 
 /** Draws a decor item inside a slot rect, skewed onto the wall when needed. */
 fun DrawScope.drawSlotItem(g: RoomGeometry, slot: Catalog.Slot, roomId: String, item: Catalog.DecorItem, alpha: Float = 1f) {

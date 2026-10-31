@@ -1,17 +1,18 @@
 package buddy.app.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -24,10 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import buddy.app.AppController
 import buddy.app.Phase
 import buddy.core.Catalog
@@ -54,12 +52,17 @@ fun App(controller: AppController, initialSheet: Sheet = Sheet.NONE, initialDeco
         val busy = phase !is Phase.Idle
         val actor = rememberWanderingPip(enabled = !busy && !decorating && sheet == Sheet.NONE)
 
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFFBFE3E0), Color(0xFFE9F4EC))))) {
-            Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+        Box(
+            Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Ink.bgTop, Ink.bgBottom))),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            Column(
+                Modifier.fillMaxHeight().widthIn(max = Sizes.appWidth).fillMaxWidth().safeDrawingPadding(),
+            ) {
                 // top bar
-                Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(Space.xl), verticalAlignment = Alignment.CenterVertically) {
                     AcornCount(state.acorns)
-                    Box(Modifier.weight(1f))
+                    Spacer(Modifier.weight(1f))
                     SyncDot(controller)
                 }
                 SpeechBubble(
@@ -78,26 +81,26 @@ fun App(controller: AppController, initialSheet: Sheet = Sheet.NONE, initialDeco
                 }
                 // bottom controls
                 if (decorating) {
-                    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                        ChunkyButton("Done decorating", color = Ink.leaf, textColor = Color.White) { decorating = false; pickingSlot = null; preview = null }
+                    Box(Modifier.fillMaxWidth().padding(Space.xxl), contentAlignment = Alignment.Center) {
+                        ChunkyButton("Done decorating", color = Ink.leaf, textColor = Ink.onSelected) { decorating = false; pickingSlot = null; preview = null }
                     }
                 } else {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp), verticalAlignment = Alignment.Bottom) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = Space.md, vertical = Space.lg), verticalAlignment = Alignment.Bottom) {
                         Column {
-                            IconButton(Glyph.ROOMS, "Rooms", Color(0xFFDDEFEA)) { sheet = Sheet.ROOMS }
-                            IconButton(Glyph.STATS, "Stats", Color(0xFFFCEBD0)) { sheet = Sheet.STATS }
-                            IconButton(Glyph.SHOP, "Shop", Color(0xFFFADCD3)) { sheet = Sheet.SHOP }
+                            IconButton(Glyph.ROOMS, "Rooms", Ink.roomsTint) { sheet = Sheet.ROOMS }
+                            IconButton(Glyph.STATS, "Stats", Ink.statsTint) { sheet = Sheet.STATS }
+                            IconButton(Glyph.SHOP, "Shop", Ink.shopTint) { sheet = Sheet.SHOP }
                         }
-                        Box(Modifier.weight(1f).padding(bottom = 12.dp), contentAlignment = Alignment.Center) {
+                        Box(Modifier.weight(1f).padding(bottom = Space.xl), contentAlignment = Alignment.Center) {
                             ChunkyButton(
-                                "Focus", color = Ink.leaf, textColor = Color.White, fontSize = 30.sp,
-                                padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 40.dp, vertical = 16.dp),
+                                "Focus", color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.focus,
+                                padding = PaddingValues(horizontal = 40.dp, vertical = Space.xxl),
                             ) { sheet = Sheet.FOCUS }
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            IconButton(Glyph.DECORATE, "Decorate", Color(0xFFDCE6F5)) { decorating = true }
-                            IconButton(Glyph.BUDDY, controller.state.value.style.name, Color(0xFFF6E2C4)) { sheet = Sheet.EDITOR }
-                            IconButton(Glyph.SETTINGS, "Settings", Color(0xFFE8E2DA)) { sheet = Sheet.SETTINGS }
+                            IconButton(Glyph.DECORATE, "Decorate", Ink.decorateTint) { decorating = true }
+                            IconButton(Glyph.BUDDY, controller.state.value.style.name, Ink.buddyTint) { sheet = Sheet.EDITOR }
+                            IconButton(Glyph.SETTINGS, "Settings", Ink.settingsTint) { sheet = Sheet.SETTINGS }
                         }
                     }
                 }
@@ -129,18 +132,6 @@ fun App(controller: AppController, initialSheet: Sheet = Sheet.NONE, initialDeco
 }
 
 @Composable
-fun SpeechBubble(text: String) {
-    Box(Modifier.fillMaxWidth().padding(horizontal = 40.dp), contentAlignment = Alignment.Center) {
-        val shape = RoundedCornerShape(22.dp)
-        Text(
-            text, textAlign = TextAlign.Center, style = label(16.sp),
-            modifier = Modifier.widthIn(max = 360.dp).clip(shape).background(Color.White.copy(alpha = 0.85f))
-                .border(2.dp, Ink.outline.copy(alpha = 0.25f), shape).padding(horizontal = 18.dp, vertical = 10.dp),
-        )
-    }
-}
-
-@Composable
 private fun SyncDot(controller: AppController) {
     val s by controller.sync.collectAsState()
     val (color, text) = when (val v = s) {
@@ -149,8 +140,8 @@ private fun SyncDot(controller: AppController) {
         is buddy.app.SyncStatus.Ok -> Ink.leaf to "synced"
         is buddy.app.SyncStatus.Failed -> Ink.berry to "offline"
     }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Box(Modifier.padding(2.dp).clip(RoundedCornerShape(50)).background(color).padding(5.dp))
-        Text(text, style = label(12.sp, color = Ink.muted))
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+        Box(Modifier.padding(Space.xxs).clip(Shapes.pill).background(color).padding(5.dp))
+        Text(text, style = label(Type.foot, color = Ink.muted))
     }
 }

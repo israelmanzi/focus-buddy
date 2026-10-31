@@ -5,17 +5,23 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import buddy.app.art.Mood
 import buddy.app.art.RoomGeometry
 import buddy.app.art.drawPip
@@ -27,7 +33,14 @@ import buddy.core.CompanionStyle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.min
 import kotlin.random.Random
+
+/**
+ * Width/height ratio at which the room just fits vertically. Wider than this and the floor/walls
+ * would be clipped in short windows, so [RoomScene] narrows the scene instead.
+ */
+private const val ROOM_FIT_RATIO = 1.15f
 
 /** Where Pip is on the floor (iso coords) and what it is doing. */
 class PipActor {
@@ -66,9 +79,15 @@ fun rememberWanderingPip(enabled: Boolean): PipActor {
     return actor
 }
 
+/** A decor slot paired with its floor depth, computed once per scene size. */
+private data class Placed(val slot: Catalog.Slot, val bottom: Float)
+
 /**
  * The isometric room with its decor and Pip. In decorate mode every slot shows a tappable marker.
  * [preview] temporarily shows an item in a slot (decorate picker).
+ *
+ * The scene is drawn every frame (Pip breathes), so everything static — geometry, slot lists,
+ * decor lookup, draw order — is remembered rather than rebuilt in the draw lambda.
  */
 @Composable
 fun RoomScene(
@@ -86,53 +105,83 @@ fun RoomScene(
 ) {
     val room = Catalog.room(roomId) ?: return
     val t = rememberSeconds()
-    var geometry by remember { mutableStateOf<RoomGeometry?>(null) }
-    Canvas(
-        modifier.pointerInput(roomId, decorating) {
-            detectTapGestures { pos ->
-                val g = geometry ?: return@detectTapGestures
-                if (decorating) {
-                    room.slots.minByOrNull { (g.slotRect(it, roomId).center - pos).getDistance() }
-                        ?.takeIf { (g.slotRect(it, roomId).center - pos).getDistance() < g.w * 0.14f }
-                        ?.let(onSlotTap)
-                } else {
-                    val feet = g.floor(actor.i.value, actor.j.value)
-                    if (abs(pos.x - feet.x) < g.w * 0.12f && pos.y in feet.y - g.w * 0.28f..feet.y) onPipTap()
-                }
-            }
-        },
-    ) {
-        val g = RoomGeometry(size).also { if (geometry?.size != size) geometry = it }
-        drawRoomShell(g, roomId)
+    var sceneSize by remember { mutableStateOf(Size.Zero) }
+    val geometry = remember(sceneSize) { RoomGeometry(sceneSize) }
 
-        fun itemFor(slot: Catalog.Slot): Catalog.DecorItem? {
-            if (preview != null && preview.first == slot.id) return preview.second
-            return equipped[slot.id]?.let(Catalog::decor)
+    // Slot placement only depends on the room and the scene size.
+    val wallItems = remember(roomId, equipped, preview, geometry) {
+        val g = geometry
+        room.slots.filter { g.isWall(it, roomId) }.mapNotNull { s ->
+            itemFor(s, equipped, preview)?.let { s to it }
+        } + room.slots.filter { g.isRug(it, roomId) }.mapNotNull { s ->
+            itemFor(s, equipped, preview)?.let { s to it }
         }
+    }
+    val floorItems = remember(roomId, equipped, preview, geometry) {
+        val g = geometry
+        room.slots.filter { !g.isWall(it, roomId) && !g.isRug(it, roomId) }
+            .map { Placed(it, g.slotRect(it, roomId).bottom) }
+            .sortedBy { it.bottom }
+    }
+    val slotRects = remember(roomId, geometry) { room.slots.associateWith { geometry.slotRect(it, roomId) } }
 
-        val wall = room.slots.filter { g.isWall(it, roomId) }
-        val rugs = room.slots.filter { g.isRug(it, roomId) }
-        val standing = room.slots.filter { !g.isWall(it, roomId) && !g.isRug(it, roomId) }
+    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+        // Keep the phone-proportioned room: narrow the canvas in short/wide windows.
+        val fitWidth = minOf(maxWidth, maxHeight * ROOM_FIT_RATIO)
+        Canvas(
+            Modifier
+                .width(fitWidth)
+                .fillMaxHeight()
+                .onSizeChanged { sceneSize = Size(it.width.toFloat(), it.height.toFloat()) }
+                .pointerInput(roomId, decorating, geometry) {
+                    detectTapGestures { pos ->
+                        if (decorating) {
+                            room.slots
+                                .minByOrNull { slotRects[it]?.center?.minus(pos)?.getDistance() ?: Float.MAX_VALUE }
+                                ?.takeIf { (slotRects[it]?.center?.minus(pos)?.getDistance() ?: Float.MAX_VALUE) < geometry.w * 0.14f }
+                                ?.let(onSlotTap)
+                        } else {
+                            val feet = geometry.floor(actor.i.value, actor.j.value)
+                            if (abs(pos.x - feet.x) < geometry.w * 0.12f && pos.y in feet.y - geometry.w * 0.28f..feet.y) onPipTap()
+                        }
+                    }
+                },
+        ) {
+            val g = geometry
+            drawRoomShell(g, roomId)
+            for ((slot, item) in wallItems) drawSlotItem(g, slot, roomId, item)
 
-        for (s in wall + rugs) itemFor(s)?.let { drawSlotItem(g, s, roomId, it) }
+            // Depth-sort the moving Pip against the pre-sorted floor items.
+            val pipFeet = g.floor(actor.i.value, actor.j.value)
+            var drawnPip = false
+            for (placed in floorItems) {
+                if (showPip && !drawnPip && placed.bottom > pipFeet.y) {
+                    drawPip(pipFeet, g.w * 0.3f, style, actor.mood, t.value, actor.facing)
+                    drawnPip = true
+                }
+                val item = itemFor(placed.slot, equipped, preview) ?: continue
+                drawSlotItem(g, placed.slot, roomId, item)
+            }
+            if (showPip && !drawnPip) drawPip(pipFeet, g.w * 0.3f, style, actor.mood, t.value, actor.facing)
 
-        // depth-sort floor items and Pip by their base y
-        val pipFeet = g.floor(actor.i.value, actor.j.value)
-        val drawables = standing.map { s -> g.slotRect(s, roomId).bottom to { itemFor(s)?.let { drawSlotItem(g, s, roomId, it) }; Unit } } +
-            (if (showPip) listOf(pipFeet.y to { drawPip(pipFeet, g.w * 0.3f, style, actor.mood, t.value, actor.facing) }) else emptyList())
-        drawables.sortedBy { it.first }.forEach { it.second() }
-
-        if (decorating) {
-            for (s in room.slots) {
-                val c = g.slotRect(s, roomId).center
-                val r = g.w * 0.045f
-                val sel = s.id == selectedSlot
-                val pulse = if (sel) 1f else 0.92f + 0.08f * kotlin.math.sin(t.value * 4f)
-                drawCircle(if (sel) Ink.berry else Ink.leaf, r * pulse, c)
-                drawCircle(Ink.outline, r * pulse, c, style = Stroke(g.w * 0.007f))
-                drawLine(Color.White, Offset(c.x - r * 0.5f, c.y), Offset(c.x + r * 0.5f, c.y), g.w * 0.012f)
-                drawLine(Color.White, Offset(c.x, c.y - r * 0.5f), Offset(c.x, c.y + r * 0.5f), g.w * 0.012f)
+            if (decorating) {
+                val pulse = 0.92f + 0.08f * kotlin.math.sin(t.value * 4f)
+                for (s in room.slots) {
+                    val c = slotRects[s]?.center ?: continue
+                    val r = g.w * 0.045f
+                    val sel = s.id == selectedSlot
+                    val scale = if (sel) 1f else pulse
+                    drawCircle(if (sel) Ink.berry else Ink.leaf, r * scale, c)
+                    drawCircle(Ink.outline, r * scale, c, style = Stroke(g.w * 0.007f))
+                    drawLine(Color.White, Offset(c.x - r * 0.5f, c.y), Offset(c.x + r * 0.5f, c.y), g.w * 0.012f)
+                    drawLine(Color.White, Offset(c.x, c.y - r * 0.5f), Offset(c.x, c.y + r * 0.5f), g.w * 0.012f)
+                }
             }
         }
     }
+}
+
+private fun itemFor(slot: Catalog.Slot, equipped: Map<String, String>, preview: Pair<String, Catalog.DecorItem?>?): Catalog.DecorItem? {
+    if (preview != null && preview.first == slot.id) return preview.second
+    return equipped[slot.id]?.let(Catalog::decor)
 }
