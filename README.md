@@ -42,7 +42,7 @@ fully offline and catches up later. Backups (Settings → Backup) are plain JSON
 - Remembers window size and position; minimum 360×560.
 - Space opens the focus sheet, Esc closes whatever is open.
 - Optional keep-awake (Settings → Keep screen on) blocks idle sleep through logind while focusing.
-- Closing the window quits; a tray icon (where the desktop supports one) offers start/stop/open.
+- Closing the window quits. A StatusNotifierItem tray icon (XFCE, KDE, GNOME with an SNI extension) offers open/start/stop/quit with a transparent icon; it is simply absent where no StatusNotifier host runs.
 - Session-finished and break-over notifications use the freedesktop notification service.
 
 ## Sounds

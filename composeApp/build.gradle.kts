@@ -36,6 +36,10 @@ kotlin {
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.coroutines.swing)
+            // StatusNotifierItem tray: D-Bus over the session bus's unix socket.
+            implementation(libs.dbus.java.core)
+            implementation(libs.dbus.java.transport.native.unixsocket)
+            implementation(libs.slf4j.nop)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

@@ -17,7 +17,6 @@ import kotlinx.coroutines.MainScope
 import java.awt.Dimension
 import java.awt.MenuItem
 import java.awt.PopupMenu
-import java.awt.SystemTray
 import java.awt.TrayIcon
 import java.awt.Toolkit
 import java.io.File
@@ -102,19 +101,18 @@ fun main() {
     val geometry = WindowGeometry(File(DesktopPlatform.dataDir, "window.txt"))
     val (initialPos, initialSize) = geometry.load()
 
-    val traySupported = runCatching { java.awt.SystemTray.isSupported() }.getOrDefault(false) &&
-        System.getenv("BUDDY_NO_TRAY") == null
+    val trayEnabled = System.getenv("BUDDY_NO_TRAY") == null
 
     application {
         var awtWindow by remember { mutableStateOf<java.awt.Window?>(null) }
+        var tray by remember { mutableStateOf<TraySni?>(null) }
         val windowState = rememberWindowState(position = initialPos, size = initialSize)
 
-        // Closing hides to the tray instead of disposing the window: disposing a Skiko/X11 window
-        // crashes inside libX11 on some Fedora + Mesa combinations.
         fun saveGeometry() = awtWindow?.let { geometry.savePoints(it.location, it.size) }
         fun quit() {
             saveGeometry()
             DesktopPlatform.keepAwake(false)
+            runCatching { tray?.close() }
             Runtime.getRuntime().halt(0)
         }
         // Minimise rather than hide/dispose: destroying or hiding a Skiko/X11 window crashes inside
@@ -140,7 +138,34 @@ fun main() {
             onDispose {
                 saveGeometry()
                 DesktopPlatform.keepAwake(false)
+                runCatching { tray?.close() }
             }
+        }
+
+        // StatusNotifierItem tray (real ARGB icon in XFCE and other SNI panels). Optional: if the
+        // session bus or the transport is unavailable the app simply runs without a tray.
+        if (trayEnabled) LaunchedEffect(Unit) {
+            tray = runCatching {
+                TraySni(
+                    icon = loadIconImage(),
+                    restore = { java.awt.EventQueue.invokeLater { restore() } },
+                    isRunning = { controller.phase.value is Phase.Running },
+                    startSession = {
+                        java.awt.EventQueue.invokeLater {
+                            restore()
+                            controller.startSession(
+                                controller.settings.value.defaultMinutes,
+                                controller.settings.value.countUp,
+                                controller.settings.value.lastTag,
+                                false,
+                            )
+                        }
+                    },
+                    stopSession = { java.awt.EventQueue.invokeLater { controller.stopSession() } },
+                    quit = { quit() },
+                    menuOrigin = { awtWindow },
+                )
+            }.getOrNull()
         }
 
         Window(
@@ -158,44 +183,5 @@ fun main() {
             App(controller)
         }
 
-        // AWT tray with an ARGB image: Compose's Tray takes a Painter and flattens transparency,
-        // which made the round icon show on an opaque square.
-        if (traySupported) LaunchedEffect(Unit) {
-            val tray = SystemTray.getSystemTray()
-            val src = loadIconImage() ?: return@LaunchedEffect
-            val dim = tray.trayIconSize
-            val image = src.getScaledInstance(dim.width, dim.height, java.awt.Image.SCALE_SMOOTH)
-            val trayIcon = TrayIcon(image, "Focus Buddy")
-            trayIcon.isImageAutoSize = true
-
-            fun buildMenu() {
-                val m = PopupMenu()
-                MenuItem("Open Focus Buddy").apply { addActionListener { restore() }; m.add(this) }
-                if (controller.phase.value is Phase.Running) {
-                    MenuItem("Stop session").apply { addActionListener { controller.stopSession() }; m.add(this) }
-                } else {
-                    MenuItem("Start a focus session").apply {
-                        addActionListener {
-                            restore()
-                            controller.startSession(
-                                controller.settings.value.defaultMinutes,
-                                controller.settings.value.countUp,
-                                controller.settings.value.lastTag,
-                                false,
-                            )
-                        }
-                        m.add(this)
-                    }
-                }
-                m.addSeparator()
-                MenuItem("Quit").apply { addActionListener { quit() }; m.add(this) }
-                trayIcon.popupMenu = m
-            }
-
-            buildMenu()
-            trayIcon.addActionListener { restore() }
-            runCatching { tray.add(trayIcon) }
-            controller.phase.collect { java.awt.EventQueue.invokeLater { buildMenu() } }
-        }
     }
 }
