@@ -24,7 +24,7 @@ class SyncClient {
 
     /** `baseUrl` like `http://100.64.0.5:8787`. Throws on network or HTTP errors. */
     suspend fun sync(baseUrl: String, token: String, req: SyncRequest): SyncResponse {
-        val res = http.post(baseUrl.trimEnd('/') + "/v1/sync") {
+        val res = http.post(baseUrl.trim().trimEnd('/') + "/v1/sync") {
             bearerAuth(token)
             contentType(ContentType.Application.Json)
             setBody(req)

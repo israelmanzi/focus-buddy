@@ -47,7 +47,13 @@ class EventStore(path: String) : AutoCloseable {
      * database; we then answer from 0 so it re-learns everything (clients dedupe by id).
      */
     fun sync(since: Long, incoming: List<Pair<String, String>>, limit: Int): Page = synchronized(lock) {
+        require(limit > 0) { "limit must be positive" }
         try {
+            // Remember the high-water mark before inserting: inserting this request's events can
+            // push it past a cursor from an older/reset database, which must still be detected.
+            val maxBefore = conn.createStatement().use { st ->
+                st.executeQuery("SELECT COALESCE(MAX(seq), 0) FROM events").use { rs -> rs.next(); rs.getLong(1) }
+            }
             var inserted = 0
             if (incoming.isNotEmpty()) {
                 val now = System.currentTimeMillis()
@@ -63,7 +69,7 @@ class EventStore(path: String) : AutoCloseable {
             val max = conn.createStatement().use { st ->
                 st.executeQuery("SELECT COALESCE(MAX(seq), 0) FROM events").use { rs -> rs.next(); rs.getLong(1) }
             }
-            val from = if (since > max) 0 else since
+            val from = if (since > maxBefore) 0 else since
             val rows = ArrayList<Row>()
             conn.prepareStatement("SELECT seq, json FROM events WHERE seq > ? ORDER BY seq LIMIT ?").use { ps ->
                 ps.setLong(1, from)

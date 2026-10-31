@@ -139,6 +139,17 @@ class SyncServerTest {
     }
 
     @Test
+    fun cursorFromAnotherDatabaseIsResetEvenWhenTheRequestAlsoUploads() = app {
+        // A client whose cursor came from an older/wiped database sends a batch of its own
+        // events. Inserting them must not make the stale cursor look valid: the client still
+        // needs everything the new database already holds.
+        val upload = (1..20).map { ev("u$it", ts = it.toLong()) }
+        val res = client.sync(10, upload)
+        assertEquals(upload, res.events)
+        assertEquals(20, res.cursor)
+    }
+
+    @Test
     fun unknownPayloadTypesAreStoredOpaquely() = app {
         val raw = """{"since":0,"events":[{"id":"n1","device":"A","ts":5,"payload":{"type":"future","x":1}}]}"""
         val res = client.rawSync(raw)

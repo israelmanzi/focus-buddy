@@ -27,7 +27,7 @@
 
     <application
         android:name="buddy.app.BuddyApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="Focus Buddy"
         android:usesCleartextTraffic="true"

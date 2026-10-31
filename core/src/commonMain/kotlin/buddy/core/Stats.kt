@@ -92,7 +92,7 @@ class Stats(state: GameState, private val tz: TimeZone, private val nowMs: Long)
             StatsRange.MONTH -> LocalDate(today.year, today.month, 1)
             StatsRange.YEAR -> LocalDate(today.year, 1, 1)
         }
-        return done.filter { dateOf(it) >= from }
+        return done.filter { val d = dateOf(it); d >= from && d <= today }
             .groupBy { it.session.tag }
             .map { (tag, rs) -> tag to rs.sumOf { minutes(it) } }
             .sortedByDescending { it.second }

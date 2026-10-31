@@ -80,14 +80,17 @@ class FocusService : Service() {
         var since = System.currentTimeMillis() - 10 * 60_000L
         while (currentCoroutineContext().isActive) {
             val now = System.currentTimeMillis()
-            if (power.isInteractive) {
+            val interactive = power.isInteractive
+            if (interactive) {
                 withContext(Dispatchers.IO) { lastResumed(usm, since, now) }?.let { current = it }
-                since = now - 2_000
                 val pkg = current
                 val ended = endsAt?.let { now >= it } == true
                 if (pkg != null && !ended && now >= pausedUntil && isBlocked(pkg)) showOverlay(pkg, now) else hideOverlay()
             }
-            delay(700)
+            // Keep the query window small even after the screen was off for hours, and don't
+            // wake the CPU ten times a second with a foreground app that cannot change.
+            since = now - 2_000
+            delay(if (interactive) POLL_MS else SLEEP_POLL_MS)
         }
     }
 
@@ -192,6 +195,8 @@ class FocusService : Service() {
 
     companion object {
         private const val TAG = "FocusService"
+        private const val POLL_MS = 700L
+        private const val SLEEP_POLL_MS = 5_000L
         private const val EXTRA_ENDS = "endsAt"
         private const val EXTRA_STARTED = "startedAt"
         private const val EXTRA_DEEP = "deepFocus"

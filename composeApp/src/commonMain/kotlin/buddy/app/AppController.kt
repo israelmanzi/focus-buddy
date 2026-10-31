@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import java.util.UUID
 
-private const val SYNC_PAGE = 5000
+private const val SYNC_BATCH_EVENTS = 1_000
 
 sealed interface Phase {
     data object Idle : Phase
@@ -71,8 +71,19 @@ class AppController(
     private var syncJob: Job? = null
 
     init {
+        // Drop pending ids whose event never made it to disk (e.g. the process died between the
+        // two writes); they can never be sent.
+        if (meta.pending.any { it !in events }) saveMeta(meta.copy(pending = meta.pending.filter { it in events }))
         meta.running?.let { resume(it) }
-        meta.breakEndsAt?.let { if (it > clock()) startBreakTicker(it) else saveMeta(meta.copy(breakEndsAt = null)) }
+        meta.breakEndsAt?.let {
+            if (it > clock()) {
+                // Re-arm the system alarm too: alarms do not survive a reboot.
+                platform.onBreakStarted(it)
+                startBreakTicker(it)
+            } else {
+                saveMeta(meta.copy(breakEndsAt = null))
+            }
+        }
         scope.launch {
             while (isActive) {
                 if (_settings.value.autoSync) syncNow()
@@ -87,13 +98,14 @@ class AppController(
 
     fun startSession(minutes: Int, countUp: Boolean, tag: String, deepFocus: Boolean) {
         if (_phase.value is Phase.Running) return
+        cancelBreak()
         val planned = if (countUp) 0 else minutes.coerceIn(Rules.MIN_MINUTES, Rules.MAX_MINUTES)
         val rs = RunningSession(clock(), planned, countUp, tag, deepFocus)
         updateSettings { it.copy(defaultMinutes = if (countUp) it.defaultMinutes else planned, countUp = countUp, lastTag = tag, deepFocus = deepFocus) }
         saveMeta(meta.copy(running = rs, breakEndsAt = null))
         _phase.value = Phase.Running(rs)
         val s = _settings.value
-        platform.onSessionStarted(rs.startedAt, if (countUp) null else rs.startedAt + planned * 60_000L, deepFocus, BlockRules(s.allowMode, s.packages))
+        platform.onSessionStarted(rs.startedAt, SessionLogic.plannedEnd(rs), deepFocus, BlockRules(s.allowMode, s.packages))
         platform.keepScreenOn(s.screenOn)
         if (s.sfx) platform.playSound(Sound.START)
         if (s.music) platform.setAmbient(true)
@@ -101,12 +113,14 @@ class AppController(
     }
 
     /** Seconds left in the no-penalty cancel window, 0 when it has passed. */
-    fun freeCancelLeft(rs: RunningSession): Int =
-        (Rules.FREE_CANCEL_SEC - ((clock() - rs.startedAt) / 1000)).toInt().coerceAtLeast(0)
+    fun freeCancelLeft(rs: RunningSession): Int = SessionLogic.freeCancelLeft(rs, clock())
 
     /** Ends the running session. Inside the free window nothing is recorded; count-up sessions finish normally. */
     fun stopSession() {
         val rs = (_phase.value as? Phase.Running)?.session ?: return
+        // The ticker polls every 500 ms; a tap at the planned end must not record an earned
+        // countdown as abandoned just because it beat the next tick.
+        if (checkSession(rs)) return
         when {
             freeCancelLeft(rs) > 0 -> endSession(rs, null)
             rs.countUp -> finish(rs, clock(), completed = true)
@@ -144,7 +158,10 @@ class AppController(
         _phase.value = Phase.Running(rs)
         if (!checkSession(rs)) {
             val s = _settings.value
-            platform.onSessionStarted(rs.startedAt, if (rs.countUp) null else rs.startedAt + rs.plannedMin * 60_000L, rs.deepFocus, BlockRules(s.allowMode, s.packages))
+            platform.onSessionStarted(rs.startedAt, SessionLogic.plannedEnd(rs), rs.deepFocus, BlockRules(s.allowMode, s.packages))
+            // Process death loses the host-side flags; restore the ones tied to the session.
+            platform.keepScreenOn(s.screenOn)
+            if (s.music) platform.setAmbient(true)
             startSessionTicker()
         }
     }
@@ -162,20 +179,10 @@ class AppController(
 
     /** Applies the time-based rules. Returns true if the session ended. */
     private fun checkSession(rs: RunningSession): Boolean {
-        val now = clock()
-        val graceEnd = rs.awaySince?.plus(_settings.value.graceSec * 1000L)
-        val plannedEnd = if (rs.countUp) null else rs.startedAt + rs.plannedMin * 60_000L
-        return when {
-            plannedEnd != null && now >= plannedEnd && (graceEnd == null || plannedEnd <= graceEnd) -> {
-                finish(rs, plannedEnd, completed = true); true
-            }
-            graceEnd != null && now >= graceEnd -> {
-                finish(rs, rs.awaySince, completed = false); true
-            }
-            rs.countUp && now - rs.startedAt >= Rules.MAX_MINUTES * 60_000L -> {
-                finish(rs, rs.startedAt + Rules.MAX_MINUTES * 60_000L, completed = true); true
-            }
-            else -> false
+        return when (val t = SessionLogic.tick(rs, clock(), _settings.value.graceSec)) {
+            is SessionTick.Complete -> { finish(rs, t.endedAt, completed = true); true }
+            is SessionTick.Abandon -> { finish(rs, t.endedAt, completed = false); true }
+            SessionTick.Continue -> false
         }
     }
 
@@ -204,6 +211,7 @@ class AppController(
     // ---- breaks ----
 
     fun startBreak(minutes: Int) {
+        if (_phase.value is Phase.Running) return
         val endsAt = clock() + minutes * 60_000L
         updateSettings { it.copy(breakMinutes = minutes) }
         saveMeta(meta.copy(breakEndsAt = endsAt))
@@ -213,10 +221,17 @@ class AppController(
 
     fun endBreak() {
         ticker?.cancel()
+        val hadBreak = meta.breakEndsAt != null
+        cancelBreak()
+        if (hadBreak && _settings.value.sfx) platform.playSound(Sound.BREAK_END)
+        _phase.value = Phase.Idle
+    }
+
+    /** Cancels a break (and its system alarm) without the end-of-break announcement. */
+    private fun cancelBreak() {
+        if (meta.breakEndsAt == null) return
         saveMeta(meta.copy(breakEndsAt = null))
         platform.onBreakEnded()
-        if (_settings.value.sfx) platform.playSound(Sound.BREAK_END)
-        _phase.value = Phase.Idle
     }
 
     private fun startBreakTicker(endsAt: Long) {
@@ -248,8 +263,11 @@ class AppController(
     private fun emit(p: Payload) {
         val e = Event(UUID.randomUUID().toString(), meta.deviceId, clock(), p)
         events[e.id] = e
+        // Persist the pending id before the event itself. If the process dies in between, the id
+        // is pruned (no event on disk); the opposite order would leave a recorded event that is
+        // never queued for sync.
+        saveMeta(meta.copy(pending = (meta.pending + e.id).distinct()))
         store.append(listOf(e))
-        saveMeta(meta.copy(pending = meta.pending + e.id))
         _state.value = GameState.fold(events.values)
         if (_settings.value.autoSync) scheduleSync()
     }
@@ -276,19 +294,33 @@ class AppController(
         if (s.syncUrl.isBlank() || _sync.value == SyncStatus.Syncing) return
         _sync.value = SyncStatus.Syncing
         try {
-            var anyFresh = false
-            // the server pages large backlogs; keep pulling until a page comes back short
-            do {
-                val sending = meta.pending.mapNotNull { events[it] }
-                val res = syncClient.sync(s.syncUrl, s.syncToken, SyncRequest(meta.syncCursor, sending))
+            var cursor = meta.syncCursor
+            while (true) {
+                // Batch uploads so a large backlog (notably after a backup import) stays under
+                // the server's body limit, and skip ids whose event never reached disk.
+                val sending = meta.pending.filter { it in events }.take(SYNC_BATCH_EVENTS).map { events.getValue(it) }
+                val res = syncClient.sync(s.syncUrl, s.syncToken, SyncRequest(cursor, sending))
                 val fresh = res.events.filter { it.id !in events }
                 fresh.forEach { events[it.id] = it }
+                // Publish each page before persisting it: a later failure must not leave the UI
+                // (and purchases) on a stale balance after some pages were merged.
+                if (fresh.isNotEmpty()) _state.value = GameState.fold(events.values)
                 store.append(fresh)
-                val sentIds = sending.map { it.id }.toSet()
-                saveMeta(meta.copy(syncCursor = res.cursor, pending = meta.pending.filter { it !in sentIds }))
-                anyFresh = anyFresh || fresh.isNotEmpty()
-            } while (res.events.size >= SYNC_PAGE)
-            if (anyFresh) _state.value = GameState.fold(events.values)
+                val sentIds = sending.mapTo(HashSet()) { it.id }
+                // A successful response acknowledges everything we sent, and heals pending ids
+                // whose event is gone.
+                saveMeta(
+                    meta.copy(
+                        syncCursor = res.cursor,
+                        pending = meta.pending.filter { it !in sentIds && it in events },
+                    ),
+                )
+                // The cursor can move *backwards* when the server was reset; any movement with
+                // events means there may be more, and an unchanged cursor means no progress.
+                val moreToPull = res.events.isNotEmpty() && res.cursor != cursor
+                cursor = res.cursor
+                if (!moreToPull && meta.pending.isEmpty()) break
+            }
             _sync.value = SyncStatus.Ok(clock())
         } catch (t: Throwable) {
             if (t is kotlinx.coroutines.CancellationException) { _sync.value = SyncStatus.Failed("cancelled"); throw t }
@@ -303,11 +335,13 @@ class AppController(
 
     /** Merges a backup into the log (never deletes). Returns how many events were new. */
     fun importBackup(json: String): Int {
-        val incoming = BuddyJson.decodeFromString(ListSerializer(Event.serializer()), json)
+        // A hand-edited or duplicated backup must not append the same id twice: the in-memory
+        // map would keep the last copy while the file keeps the first (and sync both).
+        val incoming = BuddyJson.decodeFromString(ListSerializer(Event.serializer()), json).distinctBy { it.id }
         val fresh = incoming.filter { it.id !in events }
         fresh.forEach { events[it.id] = it }
+        saveMeta(meta.copy(pending = (meta.pending + fresh.map { it.id }).distinct()))
         store.append(fresh)
-        saveMeta(meta.copy(pending = meta.pending + fresh.map { it.id }))
         _state.value = GameState.fold(events.values)
         return fresh.size
     }

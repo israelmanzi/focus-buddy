@@ -12,9 +12,24 @@ object Rules {
 
     /** Acorns for a session: 1 per focused minute, +20 % for finishing. Nothing below the minimum or if abandoned. */
     fun reward(s: Payload.Session): Int {
-        val minutes = (s.focusedSec / 60).toInt()
+        // Clamp before the Long→Int conversion: crafted or corrupted events must not overflow into
+        // a negative reward (which would take acorns away).
+        val minutes = (s.focusedSec / 60).coerceIn(0, MAX_MINUTES.toLong()).toInt()
         if (!s.completed || minutes < MIN_MINUTES) return 0
         return minutes + ceil(minutes * COMPLETION_BONUS).toInt()
+    }
+
+    /**
+     * Whether a session event is physically possible for this app. Events can arrive from backups
+     * or other devices with arbitrary numbers; dropping impossible ones keeps rewards and stats
+     * bounded and keeps every device's fold identical.
+     */
+    fun validSession(s: Payload.Session): Boolean {
+        if (s.focusedSec !in 0..(MAX_MINUTES * 60L)) return false
+        if (s.endedAt < s.startedAt) return false
+        if (s.plannedMin == 0) return true
+        if (s.plannedMin !in MIN_MINUTES..MAX_MINUTES) return false
+        return s.focusedSec <= s.plannedMin * 60L
     }
 }
 
@@ -44,7 +59,7 @@ data class GameState(
     fun roomUnlocked(roomId: String) = "room:$roomId" in owned
 
     fun apply(e: Event): GameState = when (val p = e.payload) {
-        is Payload.Session -> {
+        is Payload.Session -> if (!Rules.validSession(p)) this else {
             val r = Rules.reward(p)
             copy(acorns = acorns + r, earnedTotal = earnedTotal + r, sessions = sessions + SessionRecord(e.id, p, r))
         }
@@ -64,8 +79,11 @@ data class GameState(
             }
         }
         is Payload.Style -> {
-            fun wearable(id: String?) = id == null || "outfit:$id" in owned
-            if ("skin:${p.skin}" !in owned || !wearable(p.hat) || !wearable(p.neck) || !wearable(p.face)) this
+            fun wearable(id: String?, slot: Catalog.OutfitSlot) =
+                id == null || (Catalog.outfit(id)?.slot == slot && "outfit:$id" in owned)
+            if ("skin:${p.skin}" !in owned || !wearable(p.hat, Catalog.OutfitSlot.HAT) ||
+                !wearable(p.neck, Catalog.OutfitSlot.NECK) || !wearable(p.face, Catalog.OutfitSlot.FACE)
+            ) this
             else copy(style = CompanionStyle(p.name.take(24).ifBlank { "Pip" }, p.skin, p.hat, p.neck, p.face))
         }
         is Payload.Tag -> copy(tags = tags + (p.tagId to TagInfo(p.tagId, p.name.take(24), p.color, p.archived)))
@@ -76,6 +94,6 @@ data class GameState(
 
         /** Deterministic: every device holding the same events reaches the same state. */
         fun fold(events: Collection<Event>): GameState =
-            events.sortedWith(eventOrder).fold(GameState()) { s, e -> s.apply(e) }
+            events.sortedWith(eventOrder).distinctBy { it.id }.fold(GameState()) { s, e -> s.apply(e) }
     }
 }

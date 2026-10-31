@@ -77,8 +77,11 @@ class AndroidPlatform(private val app: Application) : Platform {
     override fun onBreakStarted(endsAtMs: Long) {
         Notify.cancel(app, Notify.ID_BREAK)
         prefs.edit { putLong(KEY_BREAK, endsAtMs) }
-        if (Build.VERSION.SDK_INT < 31 || alarms.canScheduleExactAlarms()) {
-            alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, endsAtMs, breakAlarm())
+        val exact = Build.VERSION.SDK_INT < 31 || alarms.canScheduleExactAlarms()
+        if (exact) {
+            // Permission can be revoked between the check and the call.
+            runCatching { alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, endsAtMs, breakAlarm()) }
+                .onFailure { runCatching { alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, endsAtMs, breakAlarm()) } }
         } else {
             alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, endsAtMs, breakAlarm())
         }

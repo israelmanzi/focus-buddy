@@ -4,7 +4,21 @@ import buddy.core.BuddyJson
 import buddy.core.Event
 import kotlinx.serialization.Serializable
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.nio.file.attribute.PosixFilePermissions
 import java.util.UUID
+
+/** Restrict a file to its owner: settings hold the sync token and the event log is personal data. */
+internal fun lockDown(f: File) {
+    // No-op on filesystems without POSIX permissions (and harmless there).
+    runCatching { Files.setPosixFilePermissions(f.toPath(), PosixFilePermissions.fromString("rw-------")) }
+}
+
+/** Owner-only directory (needs the execute bit to stay traversable). */
+internal fun lockDownDir(f: File) {
+    runCatching { Files.setPosixFilePermissions(f.toPath(), PosixFilePermissions.fromString("rwx------")) }
+}
 
 @Serializable
 data class LocalSettings(
@@ -54,7 +68,12 @@ class Store(private val dir: File) {
     private val settingsFile = File(dir, "settings.json")
     private val metaFile = File(dir, "device.json")
 
-    init { dir.mkdirs() }
+    init {
+        dir.mkdirs()
+        lockDownDir(dir)
+        // Tighten files created by older versions too.
+        listOf(eventsFile, settingsFile, metaFile).filter { it.exists() }.forEach(::lockDown)
+    }
 
     fun loadEvents(): List<Event> {
         if (!eventsFile.exists()) return emptyList()
@@ -66,6 +85,7 @@ class Store(private val dir: File) {
     fun append(events: List<Event>) {
         if (events.isEmpty()) return
         eventsFile.appendText(events.joinToString("") { BuddyJson.encodeToString(Event.serializer(), it) + "\n" })
+        lockDown(eventsFile)
     }
 
     /** Replace the whole log (backup import). */
@@ -86,6 +106,12 @@ class Store(private val dir: File) {
     private fun writeAtomic(f: File, text: String) {
         val tmp = File(f.parentFile, f.name + ".tmp")
         tmp.writeText(text)
-        if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) }
+        lockDown(tmp)
+        try {
+            Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        } catch (_: Exception) {
+            runCatching { Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING) }
+                .onFailure { f.delete(); tmp.renameTo(f) }
+        }
     }
 }

@@ -1,5 +1,7 @@
 package buddy.app
 
+import buddy.app.data.lockDown
+import buddy.app.data.lockDownDir
 import java.io.File
 
 enum class Sound { START, COMPLETE, BREAK_END, TAP }
@@ -50,8 +52,10 @@ interface Platform {
     /** Writes a backup file and returns its path. */
     fun saveBackup(json: String): String {
         backupDir.mkdirs()
+        lockDownDir(backupDir)
         val f = File(backupDir, "focus-buddy-backup-${System.currentTimeMillis() / 1000}.json")
         f.writeText(json)
+        lockDown(f)
         return f.absolutePath
     }
 
