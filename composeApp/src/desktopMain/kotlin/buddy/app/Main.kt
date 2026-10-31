@@ -132,6 +132,7 @@ fun main() {
         LaunchedEffect(Unit) {
             controller.phase.collect { phase ->
                 DesktopPlatform.keepAwake(phase is Phase.Running && controller.settings.value.screenOn)
+                tray?.refreshMenu()
             }
         }
         DisposableEffect(Unit) {
