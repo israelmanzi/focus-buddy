@@ -9,7 +9,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
@@ -103,20 +102,19 @@ fun main() {
     val geometry = WindowGeometry(File(DesktopPlatform.dataDir, "window.txt"))
     val (initialPos, initialSize) = geometry.load()
 
-    val traySupported = runCatching { java.awt.SystemTray.isSupported() }.getOrDefault(false) &&
-        System.getenv("BUDDY_NO_TRAY") == null
+    val trayEnabled = System.getenv("BUDDY_NO_TRAY") == null
 
     application {
         var awtWindow by remember { mutableStateOf<java.awt.Window?>(null) }
+        var tray by remember { mutableStateOf<TraySni?>(null) }
         val windowState = rememberWindowState(position = initialPos, size = initialSize)
         val icon: Painter = painterResource(Res.drawable.focus_buddy)
 
-        // Closing hides to the tray instead of disposing the window: disposing a Skiko/X11 window
-        // crashes inside libX11 on some Fedora + Mesa combinations.
         fun saveGeometry() = awtWindow?.let { geometry.savePoints(it.location, it.size) }
         fun quit() {
             saveGeometry()
             DesktopPlatform.keepAwake(false)
+            runCatching { tray?.close() }
             Runtime.getRuntime().halt(0)
         }
         // Minimise rather than hide/dispose: destroying or hiding a Skiko/X11 window crashes inside
@@ -142,7 +140,34 @@ fun main() {
             onDispose {
                 saveGeometry()
                 DesktopPlatform.keepAwake(false)
+                runCatching { tray?.close() }
             }
+        }
+
+        // StatusNotifierItem tray (real ARGB icon in XFCE and other SNI panels). Optional: if the
+        // session bus or the transport is unavailable the app simply runs without a tray.
+        if (trayEnabled) LaunchedEffect(Unit) {
+            tray = runCatching {
+                TraySni(
+                    icon = loadIconImage(),
+                    restore = { java.awt.EventQueue.invokeLater { restore() } },
+                    isRunning = { controller.phase.value is Phase.Running },
+                    startSession = {
+                        java.awt.EventQueue.invokeLater {
+                            restore()
+                            controller.startSession(
+                                controller.settings.value.defaultMinutes,
+                                controller.settings.value.countUp,
+                                controller.settings.value.lastTag,
+                                false,
+                            )
+                        }
+                    },
+                    stopSession = { java.awt.EventQueue.invokeLater { controller.stopSession() } },
+                    quit = { quit() },
+                    menuOrigin = { awtWindow },
+                )
+            }.getOrNull()
         }
 
         Window(
@@ -161,25 +186,5 @@ fun main() {
             App(controller)
         }
 
-        if (traySupported) Tray(
-            icon = icon,
-            tooltip = "Focus Buddy",
-            onAction = { restore() },
-            menu = {
-                Item("Open Focus Buddy") { restore() }
-                Separator()
-                if (controller.phase.value !is Phase.Running) Item("Start a focus session") {
-                    restore()
-                    controller.startSession(
-                        controller.settings.value.defaultMinutes,
-                        controller.settings.value.countUp,
-                        controller.settings.value.lastTag,
-                        false,
-                    )
-                } else Item("Stop session") { controller.stopSession() }
-                Separator()
-                Item("Quit") { quit() }
-            },
-        )
     }
 }
