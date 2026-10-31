@@ -1,0 +1,15 @@
+// Registers a helper task that writes the desktop test runtime classpath to a file.
+// Used by simulation/run.sh so the weekly simulation can be launched with plain `java`.
+gradle.projectsEvaluated {
+    def app = gradle.rootProject.project(':composeApp')
+    app.tasks.register('simulationClasspath') {
+        doLast {
+            def kotlinExt = app.extensions.getByName('kotlin')
+            def compilation = kotlinExt.targets.getByName('desktop').compilations.getByName('test')
+            def files = compilation.output.allOutputs.files + compilation.runtimeDependencyFiles.files
+            def out = new File(app.projectDir, 'build/simulation-classpath.txt')
+            out.parentFile.mkdirs()
+            out.text = files.join(File.pathSeparator)
+        }
+    }
+}

@@ -150,6 +150,26 @@ class SyncServerTest {
     }
 
     @Test
+    fun pagesBeyondTheDefaultPageLimit() = app {
+        val total = PAGE_LIMIT + 5
+        val all = (1..total).map { ev("big-$it", ts = it.toLong()) }
+        // Seed the store directly so this test only exercises paging, not the request body limit.
+        store.sync(0, all.map { it.id to BuddyJson.encodeToString(Event.serializer(), it) }, 1_000_000)
+
+        var since = 0L
+        val seen = mutableListOf<Event>()
+        var calls = 0
+        while (calls++ < 10) {
+            val res = client.sync(since)
+            if (res.events.isEmpty()) break
+            seen += res.events
+            since = res.cursor
+        }
+        assertEquals(all, seen)
+        assertEquals(total.toLong(), store.count())
+    }
+
+    @Test
     fun unknownPayloadTypesAreStoredOpaquely() = app {
         val raw = """{"since":0,"events":[{"id":"n1","device":"A","ts":5,"payload":{"type":"future","x":1}}]}"""
         val res = client.rawSync(raw)
