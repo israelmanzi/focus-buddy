@@ -40,6 +40,19 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
+        val desktopTest by getting
+        desktopTest.dependencies {
+            // Scenario/sync harness: run the real Ktor server in-process.
+            implementation(project(":server"))
+            implementation(libs.ktor.server.core)
+            implementation(libs.ktor.server.cio)
+            implementation(libs.ktor.server.content.negotiation)
+            implementation(libs.ktor.server.auth)
+            implementation(libs.ktor.serialization.json)
+            implementation(libs.sqlite.jdbc)
+            implementation(libs.logback)
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+        }
     }
 }
 
