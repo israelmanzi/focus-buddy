@@ -17,6 +17,8 @@ object DesktopPlatform : Platform {
     )
     override val leavingAppInterrupts = false
     override val backupDir = File(System.getProperty("user.home"), "Documents/Focus Buddy")
+    override fun playSound(sound: Sound) = DesktopSound.play(sound)
+    override fun setAmbient(on: Boolean) = DesktopSound.ambient(on)
 }
 
 fun main() {

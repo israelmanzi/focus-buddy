@@ -68,6 +68,10 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
                         }
                     }
                     Toggle("Keep screen on while focusing", s.screenOn) { v -> controller.updateSettings { it.copy(screenOn = v) } }
+                    if (p.supportsExactAlarms && !p.exactAlarmsGranted()) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("On-time break alerts", style = label(14.sp), modifier = Modifier.weight(1f))
+                        ChunkyButton("Allow", fontSize = 14.sp, padding = PaddingValues(12.dp, 8.dp)) { p.requestExactAlarms() }
+                    }
                 }
                 if (p.supportsDeepFocus) Section("Deep Focus") {
                     val ready = p.deepFocusReady()
@@ -96,6 +100,13 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
                         }
                     }
                     Text("Add tags when starting a session.", style = label(12.sp, FontWeight.Medium, Ink.muted))
+                }
+                Section("Sound") {
+                    Toggle("Ambient music while focusing", s.music) { v -> controller.updateSettings { it.copy(music = v) } }
+                    Toggle("Sound effects", s.sfx) { v ->
+                        controller.updateSettings { it.copy(sfx = v) }
+                        if (v) controller.platform.playSound(buddy.app.Sound.TAP)
+                    }
                 }
                 Section("Sync") {
                     Text("Your own server (see deploy/README.md). Leave empty to stay offline.", style = label(12.sp, FontWeight.Medium, Ink.muted))

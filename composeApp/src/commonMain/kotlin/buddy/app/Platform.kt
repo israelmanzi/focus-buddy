@@ -2,6 +2,8 @@ package buddy.app
 
 import java.io.File
 
+enum class Sound { START, COMPLETE, BREAK_END, TAP }
+
 data class AppInfo(val packageName: String, val label: String)
 
 /** What the shared controller needs from the host OS. Android implements all of it; desktop mostly no-ops. */
@@ -24,6 +26,17 @@ interface Platform {
     fun onBreakEnded() {}
 
     fun keepScreenOn(on: Boolean) {}
+
+    /** Short synthesized effects; [Sound] names the moment. */
+    fun playSound(sound: Sound) {}
+
+    /** Soft looping pad while a session runs. */
+    fun setAmbient(on: Boolean) {}
+
+    /** Android can deliver break notifications late without this; elsewhere it is always granted. */
+    val supportsExactAlarms: Boolean get() = false
+    fun exactAlarmsGranted(): Boolean = true
+    fun requestExactAlarms() {}
 
     /** Deep Focus support. */
     val supportsDeepFocus: Boolean get() = false

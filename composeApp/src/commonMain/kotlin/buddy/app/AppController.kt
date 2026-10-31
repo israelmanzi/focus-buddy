@@ -95,6 +95,8 @@ class AppController(
         val s = _settings.value
         platform.onSessionStarted(rs.startedAt, if (countUp) null else rs.startedAt + planned * 60_000L, deepFocus, BlockRules(s.allowMode, s.packages))
         platform.keepScreenOn(s.screenOn)
+        if (s.sfx) platform.playSound(Sound.START)
+        if (s.music) platform.setAmbient(true)
         startSessionTicker()
     }
 
@@ -194,6 +196,8 @@ class AppController(
         if (record != null) emit(record)
         platform.onSessionEnded()
         platform.keepScreenOn(false)
+        platform.setAmbient(false)
+        if (record != null && record.completed && _settings.value.sfx) platform.playSound(Sound.COMPLETE)
         _phase.value = Phase.Idle
     }
 
@@ -211,6 +215,7 @@ class AppController(
         ticker?.cancel()
         saveMeta(meta.copy(breakEndsAt = null))
         platform.onBreakEnded()
+        if (_settings.value.sfx) platform.playSound(Sound.BREAK_END)
         _phase.value = Phase.Idle
     }
 

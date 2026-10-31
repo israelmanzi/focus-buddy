@@ -55,6 +55,25 @@ class AndroidPlatform(private val app: Application) : Platform {
 
     override fun onReturned() = Notify.cancel(app, Notify.ID_NUDGE)
 
+    override fun playSound(sound: Sound) = SoundFx.play(sound)
+
+    override fun setAmbient(on: Boolean) = SoundFx.ambient(on)
+
+    override val supportsExactAlarms = true
+
+    override fun exactAlarmsGranted(): Boolean =
+        Build.VERSION.SDK_INT < 31 || alarms.canScheduleExactAlarms()
+
+    override fun requestExactAlarms() {
+        if (Build.VERSION.SDK_INT < 31) return
+        runCatching {
+            app.startActivity(
+                Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, "package:${app.packageName}".toUri())
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
+    }
+
     override fun onBreakStarted(endsAtMs: Long) {
         Notify.cancel(app, Notify.ID_BREAK)
         prefs.edit { putLong(KEY_BREAK, endsAtMs) }
