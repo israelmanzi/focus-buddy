@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
  * The hand-drawn sticker treatment: rounded fill with an ink outline. [onClick] makes it tappable;
  * add padding after it so the touch target hugs the sticker.
  */
+@Composable
 fun Modifier.sticker(
     shape: Shape = Shapes.card,
     color: Color = Ink.card,
@@ -64,7 +65,10 @@ fun Modifier.sticker(
     onClick: (() -> Unit)? = null,
 ): Modifier {
     val base = clip(shape).background(color).border(stroke, strokeColor, shape)
-    return if (onClick == null) base else base.clickable(onClick = onClick)
+    // No ripple or hover wash: the sticker itself is the affordance.
+    return if (onClick == null) base else base.clickable(
+        remember { MutableInteractionSource() }, indication = null, onClick = onClick,
+    )
 }
 
 /** Clickable without ripple, for scrims and whole-row hit areas. */
@@ -151,7 +155,12 @@ fun ChunkyButton(
                 .clip(Shapes.card)
                 .background(if (enabled) color else Ink.disabled)
                 .border(Strokes.bold, Ink.outline, Shapes.card)
-                .clickable(enabled = enabled, onClick = onClick)
+                .clickable(
+                    remember { MutableInteractionSource() },
+                    indication = null,
+                    enabled = enabled,
+                    onClick = onClick,
+                )
                 .padding(padding),
             contentAlignment = Alignment.Center,
         ) {

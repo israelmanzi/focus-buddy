@@ -63,7 +63,7 @@ internal object Notify {
         .build())
 
     fun breakOver(ctx: Context) = post(ctx, ID_BREAK, builder(ctx, CH_BREAK)
-        .setContentTitle("Break's over — ready to focus?")
+        .setContentTitle("Break's over. Ready to focus?")
         .setContentText("Pip is ready when you are.")
         .setPriority(NotificationCompat.PRIORITY_HIGH)
         .setCategory(NotificationCompat.CATEGORY_REMINDER)

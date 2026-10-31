@@ -228,7 +228,7 @@ fun DrawScope.drawRoomShell(g: RoomGeometry, roomId: String) {
 
 
 /** Draws a decor item inside a slot rect, skewed onto the wall when needed. */
-fun DrawScope.drawSlotItem(g: RoomGeometry, slot: Catalog.Slot, roomId: String, item: Catalog.DecorItem, alpha: Float = 1f) {
+fun DrawScope.drawSlotItem(g: RoomGeometry, slot: Catalog.Slot, roomId: String, item: Catalog.DecorItem, alpha: Float = 1f, night: Boolean = false) {
     val r = g.slotRect(slot, roomId)
     val skew = g.skew(slot, roomId)
     withTransform({
@@ -242,8 +242,8 @@ fun DrawScope.drawSlotItem(g: RoomGeometry, slot: Catalog.Slot, roomId: String, 
     }) {
         if (alpha < 1f) {
             drawContext.canvas.saveLayer(Rect(Offset.Zero, size), androidx.compose.ui.graphics.Paint().apply { this.alpha = alpha })
-            drawDecor(item, r.topLeft, r.size)
+            drawDecor(item, r.topLeft, r.size, night)
             drawContext.canvas.restore()
-        } else drawDecor(item, r.topLeft, r.size)
+        } else drawDecor(item, r.topLeft, r.size, night)
     }
 }

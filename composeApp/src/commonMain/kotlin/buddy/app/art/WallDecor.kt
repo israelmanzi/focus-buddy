@@ -167,7 +167,23 @@ private fun Pen.rod(l: Number, r: Number, y: Number, c: Color) {
 
 private fun Pen.bars(c: Color, vararg r: Path) = r.forEach { shape(it, c, 0.5f) }
 
-internal fun Pen.window(t: Theme, p: Pal) {
+private val NightTop = Color(0xFF2A3550)
+private val NightLow = Color(0xFF3C4A6B)
+
+/** Overpaints the glass with a night sky: dim gradient, stars and a crescent. */
+private fun Pen.nightGlass(g: Path, y0: Float, y1: Float) {
+    sky(g, NightTop, NightLow, y0, y1)
+    clip(g) {
+        listOf(
+            Triple(16f, 18f, 1.1f), Triple(30f, 12f, 0.8f), Triple(52f, 20f, 1.2f),
+            Triple(44f, 34f, 0.9f), Triple(22f, 40f, 1f), Triple(58f, 46f, 0.8f),
+            Triple(12f, 55f, 0.9f), Triple(36f, 58f, 1.1f),
+        ).forEach { (x, y, r) -> dot(x, y, r, Color(0xFFF4EBD0).a(0.9f)) }
+        shape(crescent(48, 26, 9), Color(0xFFF4EBD0), 0.5f)
+    }
+}
+
+internal fun Pen.window(t: Theme, p: Pal, night: Boolean = false) {
     when (t) {
         Theme.BASIC -> {
             rod(-12, 82, -6, p.wood)
@@ -178,6 +194,7 @@ internal fun Pen.window(t: Theme, p: Pal) {
                 fill(cloud(22, 24, 8), White); fill(cloud(50, 52, 6), White)
                 fill(oval(52, 20, 6), Sun)
             }
+            if (night) nightGlass(g, 6f, 74f)
             line(g, Ink, 0.5f)
             bars(White, rect(33, 6, 37, 74), rect(6, 38, 64, 42))
             shine(lines(12, 64, 22, 52)); shine(lines(12, 58, 16, 54))
@@ -195,6 +212,7 @@ internal fun Pen.window(t: Theme, p: Pal) {
                 shape(hill(6, 66, 80, 66, 30, 54, 70), p.leaf.dark(0.1f), 0.5f)
                 line(curve(18, 22, 21, 19, 24, 22), Ink, 0.4f); line(curve(24, 22, 27, 19, 30, 22), Ink, 0.4f)
             }
+            if (night) nightGlass(g, 6f, 78f)
             line(g, Ink, 0.5f)
             bars(p.wood, rect(34, 6, 38, 78), rect(6, 29, 66, 32), rect(6, 52, 66, 55))
             shape(rect(-5, 80, 77, 88, 2.5f), p.wood.dark(0.08f))
@@ -223,6 +241,7 @@ internal fun Pen.window(t: Theme, p: Pal) {
                 shape(rect(47, 50, 49, 60), p.wood.dark(0.3f), 0.4f)
                 shape(oval(48, 47, 6, 7), p.leaf, 0.4f)
             }
+            if (night) nightGlass(g, 6f, 74f)
             line(g, Ink, 0.5f)
             bars(p.main, rect(33, 6, 37, 74), rect(6, 38, 64, 42))
             shine(lines(12, 66, 22, 54))
@@ -263,6 +282,7 @@ internal fun Pen.window(t: Theme, p: Pal) {
                 for (i in 0 until 3) fill(rect(18, 52 + i * 5, 56, 53.6f + i * 5), p.skyLow)
                 shape(hill(6, 68, 80, 66, 37, 58, 66), p.accent.light(0.1f), 0.5f)
             }
+            if (night) nightGlass(g, 6f, 78f)
             line(g, Ink, 0.5f)
             bars(p.main, rect(35, 6, 39, 78))
             shine(curve(12, 30, 12, 14, 24, 10))

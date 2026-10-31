@@ -127,3 +127,19 @@ fun BuddyTheme(content: @Composable () -> Unit) {
 
 fun label(size: TextUnit = Type.bodyLarge, weight: FontWeight = FontWeight.Bold, color: Color = Ink.outline) =
     TextStyle(fontSize = size, fontWeight = weight, color = color, letterSpacing = 0.5.sp)
+
+
+/** The sky outside the room, by local hour. */
+data class Sky(
+    val top: Color,
+    val bottom: Color,
+    val light: Color,
+    val isNight: Boolean,
+)
+
+fun skyFor(hour: Int): Sky = when (hour) {
+    in 5..6 -> Sky(Color(0xFFF3B9A0), Color(0xFFFFE3C7), Color(0xFFFFD79A), false)   // dawn
+    in 7..16 -> Sky(Color(0xFFBFE3E0), Color(0xFFE9F4EC), Color(0xFFF4D06F), false)  // day
+    in 17..19 -> Sky(Color(0xFFE8A87C), Color(0xFFF6D7B0), Color(0xFFF08A5D), false) // dusk
+    else -> Sky(Color(0xFF1E2A44), Color(0xFF33415C), Color(0xFFF4EBD0), true)       // night
+}

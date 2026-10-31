@@ -13,15 +13,15 @@ import kotlin.math.min
 private const val OUTLINE = 0.035f
 
 /** Built stickers; drawing happens on the UI thread, so a plain map is enough. */
-private val cache = HashMap<Catalog.DecorItem, Sticker>()
+private val cache = HashMap<Pair<Catalog.DecorItem, Boolean>, Sticker>()
 
-internal fun decorSticker(item: Catalog.DecorItem): Sticker = cache.getOrPut(item) {
+internal fun decorSticker(item: Catalog.DecorItem, night: Boolean = false): Sticker = cache.getOrPut(item to night) {
     val p = palette(item.theme, item.variant)
     val t = item.theme
     Pen().apply {
         when (item.kind) {
             DecorKind.WALL_ART -> wallArt(t, p)
-            DecorKind.WINDOW -> window(t, p)
+            DecorKind.WINDOW -> window(t, p, night)
             DecorKind.CLOCK -> clock(t, p)
             DecorKind.SHELF -> shelf(t, p)
             DecorKind.RUG -> rug(t, p)
@@ -36,9 +36,9 @@ internal fun decorSticker(item: Catalog.DecorItem): Sticker = cache.getOrPut(ite
 }
 
 /** Draws [item] fitted inside the rect (topLeft, size), bottom-centered (floor items stand on the rect's bottom edge). */
-fun DrawScope.drawDecor(item: Catalog.DecorItem, topLeft: Offset, size: Size) {
+fun DrawScope.drawDecor(item: Catalog.DecorItem, topLeft: Offset, size: Size, night: Boolean = false) {
     if (size.width <= 0f || size.height <= 0f) return
-    val s = decorSticker(item)
+    val s = decorSticker(item, night)
     val stroke = size.minDimension * OUTLINE
     val b = s.bounds
     val k = min((size.width - stroke) / b.width, (size.height - stroke) / b.height)

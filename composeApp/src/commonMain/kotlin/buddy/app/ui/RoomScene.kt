@@ -102,6 +102,7 @@ fun RoomScene(
     preview: Pair<String, Catalog.DecorItem?>? = null,
     onSlotTap: (Catalog.Slot) -> Unit = {},
     onPipTap: () -> Unit = {},
+    night: Boolean = false,
 ) {
     val room = Catalog.room(roomId) ?: return
     val t = rememberSeconds()
@@ -149,7 +150,7 @@ fun RoomScene(
         ) {
             val g = geometry
             drawRoomShell(g, roomId)
-            for ((slot, item) in wallItems) drawSlotItem(g, slot, roomId, item)
+            for ((slot, item) in wallItems) drawSlotItem(g, slot, roomId, item, night = night)
 
             // Depth-sort the moving Pip against the pre-sorted floor items.
             val pipFeet = g.floor(actor.i.value, actor.j.value)
@@ -160,7 +161,7 @@ fun RoomScene(
                     drawnPip = true
                 }
                 val item = itemFor(placed.slot, equipped, preview) ?: continue
-                drawSlotItem(g, placed.slot, roomId, item)
+                drawSlotItem(g, placed.slot, roomId, item, night = night)
             }
             if (showPip && !drawnPip) drawPip(pipFeet, g.w * 0.3f, style, actor.mood, t.value, actor.facing)
 

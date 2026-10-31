@@ -139,7 +139,7 @@ fun FocusSetup(controller: AppController, onClose: () -> Unit) {
                         Text(
                             when {
                                 !deep -> "Leaving the app ends the session after ${settings.graceSec}s"
-                                !p.deepFocusReady() -> "Needs permissions — tap Set up"
+                                !p.deepFocusReady() -> "Needs permissions. Tap Set up"
                                 settings.packages.isEmpty() -> "No apps chosen yet (Settings)"
                                 settings.allowMode -> "Only ${settings.packages.size} allowed apps"
                                 else -> "Blocks ${settings.packages.size} apps"
@@ -173,7 +173,7 @@ fun RunningScreen(controller: AppController, phase: Phase.Running) {
     val state by controller.state.collectAsState()
     val tagInfo = state.tags[rs.tag]
 
-    Box(Modifier.fillMaxSize().background(Ink.night).clickable(enabled = false) {}) {
+    Box(Modifier.fillMaxSize().background(Ink.night)) {
         Column(Modifier.fillMaxSize().safeDrawingPadding().padding(Space.xxxl), horizontalAlignment = Alignment.CenterHorizontally) {
             Spacer(Modifier.height(Space.xxxl))
             RunningHint(rs, now)
@@ -260,7 +260,7 @@ fun InterruptedCard(controller: AppController, phase: Phase.Interrupted) {
             PipView(state.style, Mood.SAD, Modifier.size(160.dp, 150.dp))
             Title("Oh no…")
             Text(
-                if (phase.focusedMin > 0) "We focused for ${formatMinutes(phase.focusedMin)}, but the session ended early. No acorns this time — let's try again?"
+                if (phase.focusedMin > 0) "We focused for ${formatMinutes(phase.focusedMin)}, but the session ended early. No acorns this time. Shall we try again?"
                 else "The session ended before it really started. Let's try again?",
                 style = label(Type.lead, FontWeight.Medium, Ink.muted), textAlign = TextAlign.Center,
             )
@@ -290,7 +290,7 @@ fun BreakOffer(controller: AppController) {
                 }
             }
             Spacer(Modifier.height(Space.lg))
-            Text("No thanks", style = label(Type.lead, color = Ink.muted), modifier = Modifier.clickable { controller.dismissResult() }.padding(Space.md))
+            Text("No thanks", style = label(Type.lead, color = Ink.muted), modifier = Modifier.tap { controller.dismissResult() }.padding(Space.md))
         }
     }
 }
@@ -302,7 +302,7 @@ fun BreakScreen(controller: AppController, phase: Phase.OnBreak) {
     Box(Modifier.fillMaxSize().background(Ink.bgBottom)) {
         Column(Modifier.fillMaxSize().safeDrawingPadding().padding(Space.xxxl), horizontalAlignment = Alignment.CenterHorizontally) {
             Spacer(Modifier.height(Space.xxxl))
-            Text("Break time — stretch, sip, breathe.", style = label(Type.button), textAlign = TextAlign.Center)
+            Text("Break time. Stretch, sip, breathe.", style = label(Type.button), textAlign = TextAlign.Center)
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 PipView(state.style, Mood.BREAK, Modifier.size(240.dp, 240.dp))
             }

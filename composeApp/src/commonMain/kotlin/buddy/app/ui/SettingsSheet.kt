@@ -85,7 +85,7 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
                         Text(t.name, style = label(Type.body, color = if (t.archived) Ink.muted else Ink.outline), modifier = Modifier.weight(1f))
                         if (t.id != Rules.DEFAULT_TAG) Text(
                             if (t.archived) "restore" else "hide", style = label(Type.foot, color = Ink.muted),
-                            modifier = Modifier.clickable { controller.upsertTag(t.id, t.name, t.color, !t.archived) }.padding(Space.sm),
+                            modifier = Modifier.tap { controller.upsertTag(t.id, t.name, t.color, !t.archived) }.padding(Space.sm),
                         )
                     }
                 }
@@ -99,7 +99,7 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
                 }
             }
             Section("Sync") {
-                Text("Your own server (see deploy/README.md). Leave empty to stay offline.", style = label(Type.foot, FontWeight.Medium, Ink.muted))
+                Text("Sync through a server you control. Leave empty to stay offline.", style = label(Type.foot, FontWeight.Medium, Ink.muted))
                 var url by remember { mutableStateOf(s.syncUrl) }
                 var token by remember { mutableStateOf(s.syncToken) }
                 Spacer(Modifier.height(Space.sm))
@@ -142,7 +142,7 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
             }
             Section("About") {
                 Text(
-                    "Focus Buddy — free forever. No accounts, no ads, no purchases. Everything is earned by focusing, and your data stays on your devices and your own server.",
+                    "Focus Buddy. Everything is unlocked. No accounts, no ads, no purchases. Acorns come from focusing, and your data stays on your devices or your own server.",
                     style = label(Type.small, FontWeight.Medium, Ink.muted),
                 )
             }
@@ -187,7 +187,7 @@ private fun AppPicker(controller: AppController, onClose: () -> Unit) {
             list?.forEach { a ->
                 val on = a.packageName in s.packages
                 Row(
-                    Modifier.fillMaxWidth().clickable {
+                    Modifier.fillMaxWidth().tap {
                         controller.updateSettings { it.copy(packages = if (on) it.packages - a.packageName else it.packages + a.packageName) }
                     }.padding(vertical = Space.xxs),
                     verticalAlignment = Alignment.CenterVertically,

@@ -14,6 +14,7 @@ kotlin {
     jvm("desktop")
 
     sourceSets {
+        all { languageSettings.optIn("kotlin.time.ExperimentalTime") }
         val desktopMain by getting
         commonMain.dependencies {
             implementation(project(":core"))

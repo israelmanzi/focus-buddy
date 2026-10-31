@@ -1,7 +1,6 @@
 package buddy.app.ui
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -27,17 +26,17 @@ import kotlin.math.sin
 enum class Glyph { ROOMS, STATS, SHOP, DECORATE, BUDDY, SETTINGS, SYNC }
 
 @Composable
-fun IconButton(glyph: Glyph, text: String, color: Color, onClick: () -> Unit) {
+fun IconButton(glyph: Glyph, text: String, color: Color, textColor: Color = Ink.outline, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(onClick = onClick).padding(Space.xs),
+        modifier = Modifier.tap(onClick).padding(Space.xs),
     ) {
         Box(
             Modifier.size(Sizes.iconButton)
                 .sticker(Shapes.icon, color, Strokes.bold),
             contentAlignment = Alignment.Center,
         ) { Canvas(Modifier.size(34.dp)) { drawGlyph(glyph) } }
-        Text(text, style = label(Type.caption), modifier = Modifier.padding(top = Space.xxs))
+        Text(text, style = label(Type.caption, color = textColor), modifier = Modifier.padding(top = Space.xxs))
     }
 }
 

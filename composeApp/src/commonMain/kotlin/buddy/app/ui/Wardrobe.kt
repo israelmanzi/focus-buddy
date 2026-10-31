@@ -111,7 +111,7 @@ private fun Wardrobe(controller: AppController, shop: Boolean, onClose: () -> Un
                     }
                 } else Text("Need ${sel.price - state.acorns} more acorns", style = label(Type.body, FontWeight.Medium, Ink.muted))
             } else if (shop) {
-                Text("Earn acorns by focusing — everything here is free to earn.", style = label(Type.small, FontWeight.Medium, Ink.muted))
+                Text("Earn acorns by focusing. Everything here is free.", style = label(Type.small, FontWeight.Medium, Ink.muted))
             }
         }
         Spacer(Modifier.height(Space.md))
