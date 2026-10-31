@@ -202,10 +202,13 @@ class AppController(
         endSession(rs, session)
         _phase.value = when {
             reward > 0 -> Phase.Rewarded(reward, (sec / 60).toInt()).also {
-                platform.showNotification("Session complete", "+$reward acorns · ${sec / 60} min focused")
+                platform.showNotification(
+                    Strings.Notifications.completeTitle,
+                    Strings.Notifications.completeBody(reward, (sec / 60).toInt()),
+                )
             }
             else -> Phase.Interrupted((sec / 60).toInt()).also {
-                platform.showNotification("Session ended early", "No acorns this time. Try again?")
+                platform.showNotification(Strings.Notifications.endedTitle, Strings.Notifications.endedBody)
             }
         }
     }
@@ -337,8 +340,8 @@ class AppController(
             }
             _sync.value = SyncStatus.Ok(clock())
         } catch (t: Throwable) {
-            if (t is kotlinx.coroutines.CancellationException) { _sync.value = SyncStatus.Failed("cancelled"); throw t }
-            _sync.value = SyncStatus.Failed(t.message ?: t::class.simpleName ?: "error")
+            if (t is kotlinx.coroutines.CancellationException) { _sync.value = SyncStatus.Failed(Strings.Sync.cancelled); throw t }
+            _sync.value = SyncStatus.Failed(t.message ?: t::class.simpleName ?: Strings.Sync.error)
         }
     }
 

@@ -24,13 +24,19 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import buddy.app.AppController
+import buddy.app.Strings
 import buddy.app.art.Mood
 import buddy.app.art.PipView
 import buddy.app.art.drawPip
 import buddy.core.Catalog
 import buddy.core.CompanionStyle
 
-private enum class WardrobeTab(val title: String) { SKIN("Colours"), HAT("Hats"), NECK("Neck"), FACE("Face") }
+private enum class WardrobeTab(val title: String) {
+    SKIN(Strings.Shop.tabColours),
+    HAT(Strings.Shop.tabHats),
+    NECK(Strings.Shop.tabNeck),
+    FACE(Strings.Shop.tabFace),
+}
 
 /** One option in a wardrobe grid: the owned-item id, a style to preview, and its price if not owned. */
 private data class Option(val itemId: String?, val name: String, val preview: CompanionStyle, val price: Int?)
@@ -54,7 +60,7 @@ private fun Wardrobe(controller: AppController, shop: Boolean, onClose: () -> Un
         }
         else -> {
             val slot = Catalog.OutfitSlot.valueOf(tab.name)
-            listOf(Option(null, "None", draft.with(slot, null), null)) + Catalog.outfits.filter { it.slot == slot }.map { o ->
+            listOf(Option(null, Strings.Shop.none, draft.with(slot, null), null)) + Catalog.outfits.filter { it.slot == slot }.map { o ->
                 Option("outfit:${o.id}", o.name, draft.with(slot, o.id), o.price.takeIf { !state.owns("outfit:${o.id}") })
             }
         }
@@ -62,15 +68,15 @@ private fun Wardrobe(controller: AppController, shop: Boolean, onClose: () -> Un
 
     SheetCard(onClose) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Title(if (shop) "Shop" else "Edit ${state.style.name}", Type.titleLarge)
+            Title(if (shop) Strings.Shop.title else Strings.Shop.editTitle(state.style.name), Type.titleLarge)
             Spacer(Modifier.weight(1f))
             AcornCount(state.acorns)
         }
         if (!shop) {
             Spacer(Modifier.height(Space.md))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Name", style = label(Type.body)); Spacer(Modifier.width(Space.md))
-                TextInput(draft.name, { draft = draft.copy(name = it.take(24)) }, "Pip", Modifier.weight(1f))
+                Text(Strings.Shop.name, style = label(Type.body)); Spacer(Modifier.width(Space.md))
+                TextInput(draft.name, { draft = draft.copy(name = it.take(24)) }, Strings.Shop.nameHint, Modifier.weight(1f))
             }
         }
         PipView(selected?.preview ?: draft, if (shop) Mood.HAPPY else Mood.IDLE, Modifier.size(150.dp, 140.dp))
@@ -83,7 +89,7 @@ private fun Wardrobe(controller: AppController, shop: Boolean, onClose: () -> Un
                         val wearing = (if (tab == WardrobeTab.SKIN) "skin:${draft.skin}" else draft.of(tab)?.let { "outfit:$it" }) == o.itemId
                         ItemCell(
                             selected = selected == o || (selected == null && wearing),
-                            footer = if (wearing) "wearing" else o.name,
+                            footer = if (wearing) Strings.Shop.wearing else o.name,
                             price = o.price,
                             modifier = Modifier.weight(1f),
                             onClick = {
@@ -101,7 +107,7 @@ private fun Wardrobe(controller: AppController, shop: Boolean, onClose: () -> Un
             val sel = selected
             if (sel?.price != null && sel.itemId != null) {
                 if (state.canAfford(sel.itemId)) ChunkyButton(
-                    "Buy ${sel.name} · ${sel.price}", color = Ink.leaf, textColor = Ink.onSelected,
+                    Strings.Shop.buy(sel.name, sel.price), color = Ink.leaf, textColor = Ink.onSelected,
                     fontSize = Type.lead, padding = PaddingValues(14.dp, Space.lg),
                 ) {
                     if (controller.buy(sel.itemId)) {
@@ -109,17 +115,17 @@ private fun Wardrobe(controller: AppController, shop: Boolean, onClose: () -> Un
                         controller.setStyle(draft.name, draft.skin, draft.hat, draft.neck, draft.face)
                         selected = null
                     }
-                } else Text("Need ${sel.price - state.acorns} more acorns", style = label(Type.body, FontWeight.Medium, Ink.muted))
+                } else Text(Strings.Shop.needMore(sel.price - state.acorns), style = label(Type.body, FontWeight.Medium, Ink.muted))
             } else if (shop) {
-                Text("Earn acorns by focusing. Everything here is free.", style = label(Type.small, FontWeight.Medium, Ink.muted))
+                Text(Strings.Shop.earnAcorns, style = label(Type.small, FontWeight.Medium, Ink.muted))
             }
         }
         Spacer(Modifier.height(Space.md))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.lg)) {
             if (shop) CloseButton(onClose)
             else {
-                ChunkyButton("Cancel", color = Ink.berry, textColor = Ink.onSelected, fontSize = Type.bodyLarge) { onClose() }
-                ChunkyButton("Save", color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.bodyLarge) {
+                ChunkyButton(Strings.Shop.cancel, color = Ink.berry, textColor = Ink.onSelected, fontSize = Type.bodyLarge) { onClose() }
+                ChunkyButton(Strings.Shop.save, color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.bodyLarge) {
                     controller.setStyle(draft.name, draft.skin, draft.hat, draft.neck, draft.face); onClose()
                 }
             }

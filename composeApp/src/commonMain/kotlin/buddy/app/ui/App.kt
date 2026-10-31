@@ -44,14 +44,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import buddy.app.AppController
 import buddy.app.Phase
+import buddy.app.Strings
 import buddy.core.Catalog
 
 enum class Sheet { NONE, FOCUS, SHOP, EDITOR, STATS, SETTINGS, ROOMS }
-
-private val idleLines = listOf(
-    "Ready when you are!", "Let's focus together?", "I found a good book…", "One little session?",
-    "Tea, then focus?", "I believe in us!",
-)
 
 @Composable
 fun App(controller: AppController, initialSheet: Sheet = Sheet.NONE, initialDecorating: Boolean = false) {
@@ -63,7 +59,7 @@ fun App(controller: AppController, initialSheet: Sheet = Sheet.NONE, initialDeco
         var decorating by remember { mutableStateOf(initialDecorating) }
         var pickingSlot by remember { mutableStateOf<Catalog.Slot?>(null) }
         var preview by remember { mutableStateOf<Pair<String, Catalog.DecorItem?>?>(null) }
-        var line by remember { mutableStateOf(idleLines.random()) }
+        var line by remember { mutableStateOf(Strings.Home.idleLines.random()) }
 
         // The sky follows the wall clock; a minute is plenty of resolution.
         var hour by remember { mutableStateOf(localHour(controller.now())) }
@@ -122,7 +118,7 @@ fun App(controller: AppController, initialSheet: Sheet = Sheet.NONE, initialDeco
                 }
                 SpeechBubble(
                     when {
-                        decorating -> "Tap a + to decorate ${Catalog.room(roomId)?.name?.lowercase()}"
+                        decorating -> Strings.Home.decorateRoom(Catalog.room(roomId)?.name?.lowercase().orEmpty())
                         else -> line
                     },
                 )
@@ -131,7 +127,7 @@ fun App(controller: AppController, initialSheet: Sheet = Sheet.NONE, initialDeco
                         roomId, state.equipped, state.style, actor, Modifier.fillMaxSize(),
                         showPip = !decorating, decorating = decorating, selectedSlot = pickingSlot?.id, preview = preview,
                         onSlotTap = { pickingSlot = it },
-                        onPipTap = { line = idleLines.filter { it != line }.random(); actor.mood = buddy.app.art.Mood.HAPPY },
+                        onPipTap = { line = Strings.Home.idleLines.filter { it != line }.random(); actor.mood = buddy.app.art.Mood.HAPPY },
                         night = sky.isNight,
                         animate = focused || busy,
                     )
@@ -139,25 +135,25 @@ fun App(controller: AppController, initialSheet: Sheet = Sheet.NONE, initialDeco
                 // bottom controls
                 if (decorating) {
                     Box(Modifier.fillMaxWidth().padding(Space.xxl), contentAlignment = Alignment.Center) {
-                        ChunkyButton("Done decorating", color = Ink.leaf, textColor = Ink.onSelected) { decorating = false; pickingSlot = null; preview = null }
+                        ChunkyButton(Strings.Home.doneDecorating, color = Ink.leaf, textColor = Ink.onSelected) { decorating = false; pickingSlot = null; preview = null }
                     }
                 } else {
                     Row(Modifier.fillMaxWidth().padding(horizontal = Space.md, vertical = Space.lg), verticalAlignment = Alignment.Bottom) {
                         Column {
-                            IconButton(Glyph.ROOMS, "Rooms", Ink.roomsTint, if (sky.isNight) Ink.paper else Ink.outline) { sheet = Sheet.ROOMS }
-                            IconButton(Glyph.STATS, "Stats", Ink.statsTint, if (sky.isNight) Ink.paper else Ink.outline) { sheet = Sheet.STATS }
-                            IconButton(Glyph.SHOP, "Shop", Ink.shopTint, if (sky.isNight) Ink.paper else Ink.outline) { sheet = Sheet.SHOP }
+                            IconButton(Glyph.ROOMS, Strings.Home.rooms, Ink.roomsTint, if (sky.isNight) Ink.paper else Ink.outline) { sheet = Sheet.ROOMS }
+                            IconButton(Glyph.STATS, Strings.Home.stats, Ink.statsTint, if (sky.isNight) Ink.paper else Ink.outline) { sheet = Sheet.STATS }
+                            IconButton(Glyph.SHOP, Strings.Home.shop, Ink.shopTint, if (sky.isNight) Ink.paper else Ink.outline) { sheet = Sheet.SHOP }
                         }
                         Box(Modifier.weight(1f).padding(bottom = Space.xl), contentAlignment = Alignment.Center) {
                             ChunkyButton(
-                                "Focus", color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.focus,
+                                Strings.Home.focus, color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.focus,
                                 padding = PaddingValues(horizontal = 40.dp, vertical = Space.xxl),
                             ) { sheet = Sheet.FOCUS }
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            IconButton(Glyph.DECORATE, "Decorate", Ink.decorateTint, if (sky.isNight) Ink.paper else Ink.outline) { decorating = true }
+                            IconButton(Glyph.DECORATE, Strings.Home.decorate, Ink.decorateTint, if (sky.isNight) Ink.paper else Ink.outline) { decorating = true }
                             IconButton(Glyph.BUDDY, controller.state.value.style.name, Ink.buddyTint, if (sky.isNight) Ink.paper else Ink.outline) { sheet = Sheet.EDITOR }
-                            IconButton(Glyph.SETTINGS, "Settings", Ink.settingsTint, if (sky.isNight) Ink.paper else Ink.outline) { sheet = Sheet.SETTINGS }
+                            IconButton(Glyph.SETTINGS, Strings.Home.settings, Ink.settingsTint, if (sky.isNight) Ink.paper else Ink.outline) { sheet = Sheet.SETTINGS }
                         }
                     }
                 }
@@ -193,9 +189,9 @@ private fun SyncDot(controller: AppController, night: Boolean) {
     val s by controller.sync.collectAsState()
     val (color, text) = when (val v = s) {
         buddy.app.SyncStatus.Off -> return
-        buddy.app.SyncStatus.Syncing -> Ink.butter to "syncing"
-        is buddy.app.SyncStatus.Ok -> Ink.leaf to "synced"
-        is buddy.app.SyncStatus.Failed -> Ink.berry to "offline"
+        buddy.app.SyncStatus.Syncing -> Ink.butter to Strings.Sync.dotSyncing
+        is buddy.app.SyncStatus.Ok -> Ink.leaf to Strings.Sync.dotSynced
+        is buddy.app.SyncStatus.Failed -> Ink.berry to Strings.Sync.dotOffline
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
         Box(Modifier.padding(Space.xxs).clip(Shapes.pill).background(color).padding(5.dp))

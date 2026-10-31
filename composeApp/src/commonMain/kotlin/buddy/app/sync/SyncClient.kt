@@ -1,5 +1,6 @@
 package buddy.app.sync
 
+import buddy.app.Strings
 import buddy.core.BuddyJson
 import buddy.core.SyncRequest
 import buddy.core.SyncResponse
@@ -29,7 +30,7 @@ class SyncClient {
             contentType(ContentType.Application.Json)
             setBody(req)
         }
-        if (!res.status.isSuccess()) error("Sync failed: HTTP ${res.status.value}")
+        if (!res.status.isSuccess()) error(Strings.Sync.httpFailed(res.status.value))
         return res.body()
     }
 }

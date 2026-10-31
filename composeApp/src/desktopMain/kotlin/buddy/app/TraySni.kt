@@ -226,7 +226,7 @@ class TraySni(
     private fun properties(): Map<String, Variant<*>> = linkedMapOf(
         "Category" to Variant("ApplicationStatus"),
         "Id" to Variant("focus-buddy"),
-        "Title" to Variant("Focus Buddy"),
+        "Title" to Variant(Strings.Tray.title),
         "Status" to Variant("Active"),
         "WindowId" to Variant(0),
         "IconName" to Variant(""),
@@ -236,7 +236,7 @@ class TraySni(
         "AttentionIconName" to Variant(""),
         "AttentionIconPixmap" to Variant(fallbackPixmaps, "a(iiay)"),
         "AttentionMovieName" to Variant(""),
-        "ToolTip" to Variant(SniToolTip("", emptyList(), "Focus Buddy", ""), "(sa(iiay)ss)"),
+        "ToolTip" to Variant(SniToolTip("", emptyList(), Strings.Tray.title, ""), "(sa(iiay)ss)"),
         "ItemIsMenu" to Variant(false),
         "Menu" to Variant(DBusPath(MENU_PATH), "o"),
     )
@@ -356,16 +356,16 @@ class TraySni(
         }
 
         private fun rootItem(): DbusMenuItem = menuItem(
-            ID_ROOT, "Focus Buddy",
+            ID_ROOT, Strings.Tray.title,
             children = listOf(
-                child(menuItem(ID_OPEN, "Open Focus Buddy")),
+                child(menuItem(ID_OPEN, Strings.Tray.open)),
                 child(separator(ID_SEP_1)),
                 child(
-                    if (isRunning()) menuItem(ID_SESSION, "Stop session")
-                    else menuItem(ID_SESSION, "Start a focus session")
+                    if (isRunning()) menuItem(ID_SESSION, Strings.Tray.stopSession)
+                    else menuItem(ID_SESSION, Strings.Tray.startSession)
                 ),
                 child(separator(ID_SEP_2)),
-                child(menuItem(ID_QUIT, "Quit")),
+                child(menuItem(ID_QUIT, Strings.Tray.quit)),
             ),
         )
 
@@ -420,15 +420,15 @@ class TraySni(
     }
 
     private fun buildMenu(): PopupMenu = PopupMenu().apply {
-        add(MenuItem("Open Focus Buddy").apply { addActionListener { restore() } })
+        add(MenuItem(Strings.Tray.open).apply { addActionListener { restore() } })
         addSeparator()
         if (isRunning()) {
-            add(MenuItem("Stop session").apply { addActionListener { stopSession() } })
+            add(MenuItem(Strings.Tray.stopSession).apply { addActionListener { stopSession() } })
         } else {
-            add(MenuItem("Start a focus session").apply { addActionListener { startSession() } })
+            add(MenuItem(Strings.Tray.startSession).apply { addActionListener { startSession() } })
         }
         addSeparator()
-        add(MenuItem("Quit").apply { addActionListener { quit() } })
+        add(MenuItem(Strings.Tray.quit).apply { addActionListener { quit() } })
     }
 
     /**

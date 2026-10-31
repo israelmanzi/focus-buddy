@@ -27,6 +27,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.dp
 import buddy.app.AppController
+import buddy.app.Strings
 import buddy.app.art.drawDecor
 import buddy.app.art.drawRoomShell
 import buddy.app.art.RoomGeometry
@@ -67,8 +68,8 @@ fun SlotPicker(
                     ItemCell(
                         selected = chosen == item,
                         footer = when {
-                            state.equipped[slot.id] == item.id -> "placed"
-                            state.owns(item.id) -> "owned"
+                            state.equipped[slot.id] == item.id -> Strings.Decor.placed
+                            state.owns(item.id) -> Strings.Decor.owned
                             else -> null
                         },
                         price = item.price.takeIf { !state.owns(item.id) },
@@ -79,20 +80,20 @@ fun SlotPicker(
             }
             Spacer(Modifier.height(Space.lg))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.md), verticalAlignment = Alignment.CenterVertically) {
-                ChunkyButton("Close", color = Ink.paperDeep, fontSize = Type.lead, padding = PaddingValues(14.dp, Space.lg)) { onClose() }
-                if (current != null) ChunkyButton("Clear", color = Ink.berry, textColor = Ink.onSelected, fontSize = Type.lead, padding = PaddingValues(14.dp, Space.lg)) {
+                ChunkyButton(Strings.Decor.close, color = Ink.paperDeep, fontSize = Type.lead, padding = PaddingValues(14.dp, Space.lg)) { onClose() }
+                if (current != null) ChunkyButton(Strings.Decor.clear, color = Ink.berry, textColor = Ink.onSelected, fontSize = Type.lead, padding = PaddingValues(14.dp, Space.lg)) {
                     controller.equip(slot.id, null); onClose()
                 }
                 val c = chosen
                 when {
                     c == null || c == current -> {}
-                    state.owns(c.id) -> ChunkyButton("Place", color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.lead, padding = PaddingValues(14.dp, Space.lg)) {
+                    state.owns(c.id) -> ChunkyButton(Strings.Decor.place, color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.lead, padding = PaddingValues(14.dp, Space.lg)) {
                         controller.equip(slot.id, c.id); onClose()
                     }
-                    state.canAfford(c.id) -> ChunkyButton("Buy · ${c.price}", color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.lead, padding = PaddingValues(14.dp, Space.lg)) {
+                    state.canAfford(c.id) -> ChunkyButton(Strings.Decor.buy(c.price), color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.lead, padding = PaddingValues(14.dp, Space.lg)) {
                         if (controller.buy(c.id)) controller.equip(slot.id, c.id); onClose()
                     }
-                    else -> ChunkyButton("Need ${c.price - state.acorns} more", enabled = false, fontSize = Type.body, padding = PaddingValues(14.dp, Space.lg)) {}
+                    else -> ChunkyButton(Strings.Decor.needMore(c.price - state.acorns), enabled = false, fontSize = Type.body, padding = PaddingValues(14.dp, Space.lg)) {}
                 }
             }
         }
@@ -103,7 +104,7 @@ fun SlotPicker(
 fun RoomsSheet(controller: AppController, currentRoom: String, onPick: (String) -> Unit, onClose: () -> Unit) {
     val state by controller.state.collectAsState()
     SheetCard(onClose, outerPadding = Space.xxl) {
-        Title("Rooms")
+        Title(Strings.Decor.roomsTitle)
         Spacer(Modifier.height(Space.lg))
         ScrollColumn(Modifier.weight(1f, fill = false)) {
             Catalog.rooms.chunked(2).forEach { row ->
@@ -124,12 +125,12 @@ fun RoomsSheet(controller: AppController, currentRoom: String, onPick: (String) 
                             Spacer(Modifier.height(Space.xs))
                             when {
                                 unlocked -> ChunkyButton(
-                                    if (room.id == currentRoom) "Here" else "Go",
+                                    if (room.id == currentRoom) Strings.Decor.here else Strings.Decor.go,
                                     color = Ink.leaf, textColor = Ink.onSelected,
                                     fontSize = Type.body, padding = PaddingValues(Space.xxl, Space.sm),
                                 ) { onPick(room.id) }
                                 state.canAfford("room:${room.id}") -> ChunkyButton(
-                                    "Unlock · ${room.price}",
+                                    Strings.Decor.unlock(room.price),
                                     fontSize = Type.small, padding = PaddingValues(Space.lg, Space.sm),
                                 ) { if (controller.buy("room:${room.id}")) onPick(room.id) }
                                 else -> Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = Space.md)) {
