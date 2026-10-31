@@ -97,6 +97,9 @@ fun main() {
     System.getenv("BUDDY_PREVIEW")?.let { renderPreviews(File(it)); renderScreens(File(it), File(it, "profiles")); return }
     setApplicationClassName("focus-buddy")
 
+    val instance = SingleInstance(DesktopPlatform.dataDir)
+    if (!instance.acquire()) return
+
     val controller = AppController(DesktopPlatform, MainScope())
     val geometry = WindowGeometry(File(DesktopPlatform.dataDir, "window.txt"))
     val (initialPos, initialSize) = geometry.load()
@@ -113,6 +116,7 @@ fun main() {
             saveGeometry()
             DesktopPlatform.keepAwake(false)
             runCatching { tray?.close() }
+            instance.close()
             Runtime.getRuntime().halt(0)
         }
         // Minimise rather than hide/dispose: destroying or hiding a Skiko/X11 window crashes inside
@@ -127,6 +131,7 @@ fun main() {
             w.isVisible = true
             w.toFront()
         }
+        LaunchedEffect(Unit) { instance.listen { java.awt.EventQueue.invokeLater { restore() } } }
 
         // Keep the screen awake only while a session is running and the user asked for it.
         LaunchedEffect(Unit) {
@@ -140,6 +145,7 @@ fun main() {
                 saveGeometry()
                 DesktopPlatform.keepAwake(false)
                 runCatching { tray?.close() }
+                instance.close()
             }
         }
 
