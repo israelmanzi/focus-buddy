@@ -1,19 +1,15 @@
 package buddy.app.ui
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -24,7 +20,6 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -33,13 +28,16 @@ enum class Glyph { ROOMS, STATS, SHOP, DECORATE, BUDDY, SETTINGS, SYNC }
 
 @Composable
 fun IconButton(glyph: Glyph, text: String, color: Color, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable(onClick = onClick).padding(4.dp)) {
-        val shape = RoundedCornerShape(16.dp)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable(onClick = onClick).padding(Space.xs),
+    ) {
         Box(
-            Modifier.size(56.dp).clip(shape).background(color).border(2.5.dp, Ink.outline, shape),
+            Modifier.size(Sizes.iconButton)
+                .sticker(Shapes.icon, color, Strokes.bold),
             contentAlignment = Alignment.Center,
         ) { Canvas(Modifier.size(34.dp)) { drawGlyph(glyph) } }
-        Text(text, style = label(11.sp), modifier = Modifier.padding(top = 2.dp))
+        Text(text, style = label(Type.caption), modifier = Modifier.padding(top = Space.xxs))
     }
 }
 
