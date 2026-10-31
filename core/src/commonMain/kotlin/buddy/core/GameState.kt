@@ -58,37 +58,7 @@ data class GameState(
     fun canAfford(item: String) = (Catalog.price(item) ?: Int.MAX_VALUE) <= acorns
     fun roomUnlocked(roomId: String) = "room:$roomId" in owned
 
-    fun apply(e: Event): GameState = when (val p = e.payload) {
-        is Payload.Session -> if (!Rules.validSession(p)) this else {
-            val r = Rules.reward(p)
-            copy(acorns = acorns + r, earnedTotal = earnedTotal + r, sessions = sessions + SessionRecord(e.id, p, r))
-        }
-        is Payload.Buy -> {
-            val price = Catalog.price(p.item)
-            if (price == null || p.item in owned || price > acorns) this
-            else copy(acorns = acorns - price, owned = owned + p.item)
-        }
-        is Payload.Equip -> {
-            val room = Catalog.roomOfSlot(p.slot)
-            val slot = Catalog.slot(p.slot)
-            when {
-                room == null || slot == null || !roomUnlocked(room.id) -> this
-                p.item == null -> copy(equipped = equipped - p.slot)
-                p.item !in owned || Catalog.decor(p.item)?.kind != slot.kind -> this
-                else -> copy(equipped = equipped + (p.slot to p.item))
-            }
-        }
-        is Payload.Style -> {
-            fun wearable(id: String?, slot: Catalog.OutfitSlot) =
-                id == null || (Catalog.outfit(id)?.slot == slot && "outfit:$id" in owned)
-            if ("skin:${p.skin}" !in owned || !wearable(p.hat, Catalog.OutfitSlot.HAT) ||
-                !wearable(p.neck, Catalog.OutfitSlot.NECK) || !wearable(p.face, Catalog.OutfitSlot.FACE)
-            ) this
-            else copy(style = CompanionStyle(p.name.take(24).ifBlank { "Pip" }, p.skin, p.hat, p.neck, p.face))
-        }
-        is Payload.Tag -> copy(tags = tags + (p.tagId to TagInfo(p.tagId, p.name.take(24), p.color, p.archived)))
-        Payload.Unknown -> this
-    }
+    fun apply(e: Event): GameState = Builder.of(this).also { it.apply(e) }.build()
 
     companion object {
         /**
@@ -115,11 +85,99 @@ data class GameState(
          */
         fun fold(events: Collection<Event>): GameState {
             val ordered = events.sortedWith(eventOrder)
-            val ids = ordered.groupingBy { it.id }.eachCount()
-            val unique = if (ids.none { it.value > 1 }) ordered else
-                ordered.groupBy { it.id }.values.map { group -> group.minBy { it.canonical() } }.sortedWith(eventOrder)
-            val (earn, rest) = unique.partition { it.payload is Payload.Session }
-            return (earn + rest).fold(GameState()) { s, e -> s.apply(e) }
+            val unique = if (ordered.size < 2) ordered else dedupe(ordered)
+            // One linear pass per phase: nothing is copied per event, so a large log folds in O(n).
+            val b = Builder()
+            for (e in unique) if (e.payload is Payload.Session) b.apply(e)
+            for (e in unique) if (e.payload !is Payload.Session) b.apply(e)
+            return b.build()
         }
-    }
+
+        /** Collapses events that claim the same id, keeping the lexicographically smaller JSON. */
+        private fun dedupe(ordered: List<Event>): List<Event> {
+            val byId = HashMap<String, Event>(ordered.size)
+            var duplicates = false
+            for (e in ordered) {
+                val prev = byId[e.id]
+                if (prev == null) byId[e.id] = e
+                else {
+                    duplicates = true
+                    if (e.canonical() < prev.canonical()) byId[e.id] = e
+                }
+            }
+            return if (duplicates) byId.values.sortedWith(eventOrder) else ordered
+        }
+
+        /** Mutable fold target: the public [GameState] is immutable, but rebuilding it per event is O(n²). */
+        private class Builder {
+            var acorns = 0
+            var earnedTotal = 0
+            val owned = Catalog.starterOwned.toMutableSet()
+            val equipped = Catalog.starterDecor.toMutableMap()
+            var style = CompanionStyle()
+            val tags = hashMapOf(Rules.DEFAULT_TAG to TagInfo(Rules.DEFAULT_TAG, "Focus", 0xFF7FB069, false))
+            val sessions = ArrayList<SessionRecord>()
+
+            fun apply(e: Event) {
+                when (val p = e.payload) {
+                    is Payload.Session -> if (Rules.validSession(p)) {
+                        val r = Rules.reward(p)
+                        acorns += r
+                        earnedTotal += r
+                        sessions += SessionRecord(e.id, p, r)
+                    }
+                    is Payload.Buy -> {
+                        val price = Catalog.price(p.item)
+                        if (price != null && p.item !in owned && price <= acorns) {
+                            acorns -= price
+                            owned += p.item
+                        }
+                    }
+                    is Payload.Equip -> {
+                        val room = Catalog.roomOfSlot(p.slot)
+                        val slot = Catalog.slot(p.slot)
+                        when {
+                            room == null || slot == null || "room:${room.id}" !in owned -> Unit
+                            p.item == null -> equipped.remove(p.slot)
+                            p.item in owned && Catalog.decor(p.item)?.kind == slot.kind -> equipped[p.slot] = p.item
+                        }
+                    }
+                    is Payload.Style -> {
+                        fun wearable(id: String?, slot: Catalog.OutfitSlot) =
+                            id == null || (Catalog.outfit(id)?.slot == slot && "outfit:$id" in owned)
+                        if ("skin:${p.skin}" in owned && wearable(p.hat, Catalog.OutfitSlot.HAT) &&
+                            wearable(p.neck, Catalog.OutfitSlot.NECK) && wearable(p.face, Catalog.OutfitSlot.FACE)
+                        ) {
+                            style = CompanionStyle(p.name.take(24).ifBlank { "Pip" }, p.skin, p.hat, p.neck, p.face)
+                        }
+                    }
+                    is Payload.Tag -> tags[p.tagId] = TagInfo(p.tagId, p.name.take(24), p.color, p.archived)
+                    Payload.Unknown -> Unit
+                }
+            }
+
+            fun build() = GameState(
+                acorns = acorns,
+                earnedTotal = earnedTotal,
+                owned = owned.toSet(),
+                equipped = equipped.toMap(),
+                style = style,
+                tags = tags.toMap(),
+                sessions = sessions.toList(),
+            )
+
+            companion object {
+                fun of(s: GameState) = Builder().also { b ->
+                    b.acorns = s.acorns
+                    b.earnedTotal = s.earnedTotal
+                    b.owned += s.owned
+                    b.equipped += s.equipped
+                    b.style = s.style
+                    b.tags += s.tags
+                    b.sessions += s.sessions
+                }
+            }
+        }
+
+}
 }
