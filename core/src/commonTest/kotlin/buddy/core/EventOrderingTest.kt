@@ -18,7 +18,7 @@ class EventOrderingTest {
     @Test
     fun everyArrivalOrderProducesTheSameState() {
         val events = listOf(
-            session(10, 500), // 600 acorns
+            session(10, 300), // 360 acorns (the 6 h maximum)
             event(20, Payload.Buy("decor:rug.cozy.0")),
             event(30, Payload.Equip("living.rug", "decor:rug.cozy.0")),
             event(40, Payload.Tag("study", "Study", 0xFF112233)),
