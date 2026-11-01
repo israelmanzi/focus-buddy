@@ -141,7 +141,7 @@ object Strings {
 
         const val gracePeriod = "Grace period when leaving the app"
         fun seconds(seconds: Int) = "${seconds}s"
-        const val keepScreenOn = "Keep screen on while focusing"
+        const val keepScreenOn = "Keep awake while focusing"
         const val onTimeAlerts = "On-time break alerts"
         const val allow = "Allow"
         const val permissionsGranted = "Permissions granted ✓"

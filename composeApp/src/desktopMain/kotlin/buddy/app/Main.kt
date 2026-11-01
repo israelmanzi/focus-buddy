@@ -48,19 +48,35 @@ object DesktopPlatform : Platform {
     private var inhibitor: Process? = null
 
     /** Block idle sleep while focusing (logind); released when the session ends. */
+    init {
+        // Never leave a blocking inhibitor behind, even when the JVM exits abruptly.
+        Runtime.getRuntime().addShutdownHook(Thread(::releaseAwake, "focus-buddy-inhibitor"))
+    }
+
+    /**
+     * Stops the machine from going to sleep *on idle* only. Manual suspend is a user decision and
+     * stays possible: `--what=sleep` (or `idle:sleep`) also blocks that, which is why an orphaned
+     * inhibitor once made the suspend menu do nothing.
+     *
+     * The child is `cat`, not `sleep infinity`: when this process dies, its end of the pipe closes,
+     * cat reads EOF and exits, so the inhibitor is released even on SIGKILL.
+     */
     fun keepAwake(on: Boolean) {
-        if (on) {
-            if (inhibitor?.isAlive == true) return
-            inhibitor = runCatching {
-                ProcessBuilder(
-                    "systemd-inhibit", "--what=idle:sleep", "--mode=block",
-                    "--who=Focus Buddy", "--why=Focus session in progress", "sleep", "infinity",
-                ).redirectErrorStream(true).start()
-            }.getOrNull()
-        } else {
-            inhibitor?.destroy()
-            inhibitor = null
-        }
+        if (!on) return releaseAwake()
+        if (inhibitor?.isAlive == true) return
+        inhibitor = runCatching {
+            ProcessBuilder(
+                "systemd-inhibit", "--what=idle", "--mode=block",
+                "--who=Focus Buddy", "--why=Focus session in progress", "cat",
+            ).redirectErrorStream(true).start()
+        }.getOrNull()
+    }
+
+    private fun releaseAwake() {
+        val p = inhibitor ?: return
+        inhibitor = null
+        runCatching { p.outputStream.close() }
+        runCatching { p.destroy() }
     }
 }
 
