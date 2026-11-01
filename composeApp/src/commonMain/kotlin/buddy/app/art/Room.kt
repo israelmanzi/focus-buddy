@@ -228,7 +228,10 @@ fun DrawScope.drawRoomShell(g: RoomGeometry, roomId: String) {
 
 
 /** Rasterised decor art, keyed by item, pixel size and night variant. */
-private val decorBitmaps = HashMap<DecorKey, androidx.compose.ui.graphics.ImageBitmap>()
+// Bounded so browsing rooms and previews cannot grow the cache without limit.
+private val decorBitmaps = object : LinkedHashMap<DecorKey, androidx.compose.ui.graphics.ImageBitmap>(64, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<DecorKey, androidx.compose.ui.graphics.ImageBitmap>) = size > 96
+}
 private data class DecorKey(val id: String, val w: Int, val h: Int, val night: Boolean)
 
 private fun DrawScope.decorBitmap(item: Catalog.DecorItem, w: Int, h: Int, night: Boolean): androidx.compose.ui.graphics.ImageBitmap =

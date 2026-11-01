@@ -97,7 +97,10 @@ fun rememberWanderingPip(enabled: Boolean): PipActor {
 
 /** A decor slot paired with its floor depth, computed once per scene size. */
 /** Room shells are pure vector paths; rasterise once per size instead of every frame. */
-private val shellCache = HashMap<Triple<String, Int, Int>, ImageBitmap>()
+// Bounded: a phone only ever needs the current room, but resizes and previews can add entries.
+private val shellCache = object : LinkedHashMap<Triple<String, Int, Int>, ImageBitmap>(4, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Triple<String, Int, Int>, ImageBitmap>) = size > 4
+}
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.shellBitmap(g: RoomGeometry, roomId: String): ImageBitmap {
     val w = g.size.width.toInt().coerceAtLeast(1)
