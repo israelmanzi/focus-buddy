@@ -15,7 +15,7 @@ install -m 644 "$ROOT/composeApp/icon.png" "$APP_DIR/icon.png"
 
 cat > "$HOME/.local/bin/focus-buddy" <<SH
 #!/bin/sh
-exec "$JAVA" -Xmx256m --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED -jar "$APP_DIR/focus-buddy.jar" "\$@"
+exec "$JAVA" -Xms64m -Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED -jar "$APP_DIR/focus-buddy.jar" "\$@"
 SH
 chmod 755 "$HOME/.local/bin/focus-buddy"
 

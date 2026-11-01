@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,11 +49,14 @@ private const val ROOM_FIT_RATIO = 1.15f
 
 /** Where Pip is on the floor (iso coords) and what it is doing. */
 class PipActor {
-    val i = Animatable(0.6f)
-    val j = Animatable(0.6f)
+    var i by mutableFloatStateOf(0.6f)
+    var j by mutableFloatStateOf(0.6f)
     var mood by mutableStateOf(Mood.IDLE)
     var facing by mutableStateOf(1)
 }
+
+/** Animation frame used by the walk and the shared scene clock. */
+private const val FRAME_MS = 125L
 
 @Composable
 fun rememberWanderingPip(enabled: Boolean): PipActor {
@@ -64,12 +69,20 @@ fun rememberWanderingPip(enabled: Boolean): PipActor {
                     val ti = Random.nextFloat() * 0.5f + 0.35f
                     val tj = Random.nextFloat() * 0.5f + 0.35f
                     // screen x grows with i and shrinks with j
-                    actor.facing = if ((ti - actor.i.value) - (tj - actor.j.value) >= 0) 1 else -1
-                    val dist = abs(ti - actor.i.value) + abs(tj - actor.j.value)
-                    val ms = (dist * 5000).toInt().coerceAtLeast(400)
+                    actor.facing = if ((ti - actor.i) - (tj - actor.j) >= 0) 1 else -1
+                    val i0 = actor.i
+                    val j0 = actor.j
+                    val dist = abs(ti - i0) + abs(tj - j0)
+                    val steps = ((dist * 5000).toLong() / FRAME_MS).coerceAtLeast(5L)
                     actor.mood = Mood.WALK
-                    launch { actor.i.animateTo(ti, tween(ms, easing = LinearEasing)) }
-                    actor.j.animateTo(tj, tween(ms, easing = LinearEasing))
+                    // Step the walk on the same 12 fps cadence as the clock: Animatable would
+                    // request a vsync frame every 16 ms and keep the whole window repainting.
+                    for (n in 1..steps) {
+                        val f = n.toFloat() / steps
+                        actor.i = i0 + (ti - i0) * f
+                        actor.j = j0 + (tj - j0) * f
+                        delay(FRAME_MS)
+                    }
                     actor.mood = Mood.IDLE
                     delay(1500L + Random.nextLong(2500))
                 }
@@ -123,9 +136,11 @@ fun RoomScene(
     onPipTap: () -> Unit = {},
     night: Boolean = false,
     animate: Boolean = true,
+    time: State<Float>? = null,
 ) {
     val room = Catalog.room(roomId) ?: return
-    val t = rememberSeconds(active = animate)
+    // Prefer the app's shared clock so sky and room invalidate on the same frames.
+    val t = time ?: rememberSeconds(active = animate)
     var sceneSize by remember { mutableStateOf(Size.Zero) }
     val geometry = remember(sceneSize) { RoomGeometry(sceneSize) }
 
@@ -162,7 +177,7 @@ fun RoomScene(
                                 ?.takeIf { (slotRects[it]?.center?.minus(pos)?.getDistance() ?: Float.MAX_VALUE) < geometry.w * 0.14f }
                                 ?.let(onSlotTap)
                         } else {
-                            val feet = geometry.floor(actor.i.value, actor.j.value)
+                            val feet = geometry.floor(actor.i, actor.j)
                             if (abs(pos.x - feet.x) < geometry.w * 0.12f && pos.y in feet.y - geometry.w * 0.28f..feet.y) onPipTap()
                         }
                     }
@@ -173,7 +188,7 @@ fun RoomScene(
             for ((slot, item) in wallItems) drawSlotItem(g, slot, roomId, item, night = night)
 
             // Depth-sort the moving Pip against the pre-sorted floor items.
-            val pipFeet = g.floor(actor.i.value, actor.j.value)
+            val pipFeet = g.floor(actor.i, actor.j)
             var drawnPip = false
             for (placed in floorItems) {
                 if (showPip && !drawnPip && placed.bottom > pipFeet.y) {

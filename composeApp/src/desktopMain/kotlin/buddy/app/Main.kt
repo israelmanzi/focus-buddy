@@ -68,8 +68,14 @@ object DesktopPlatform : Platform {
 private class WindowGeometry(private val file: File) {
     fun load(): Pair<WindowPosition, DpSize> {
         val p = runCatching { file.readText().trim().split(' ').map { it.toFloat() } }.getOrNull()
-        return if (p != null && p.size >= 4) WindowPosition.Absolute(p[0].dp, p[1].dp) to DpSize(p[2].dp, p[3].dp)
-        else WindowPosition.PlatformDefault to DpSize(440.dp, 860.dp)
+        if (p == null || p.size < 4) return WindowPosition.PlatformDefault to DpSize(440.dp, 860.dp)
+        val size = DpSize(p[2].dp, p[3].dp)
+        // A saved position can be off-screen after a monitor change or a WM move; clamp it.
+        val screen = java.awt.Toolkit.getDefaultToolkit().screenSize
+        val maxX = (screen.width - p[2]).coerceAtLeast(0f)
+        val maxY = (screen.height - p[3]).coerceAtLeast(0f)
+        val pos = WindowPosition.Absolute(p[0].coerceIn(0f, maxX).dp, p[1].coerceIn(0f, maxY).dp)
+        return pos to size
     }
 
     fun savePoints(location: java.awt.Point, size: java.awt.Dimension) {

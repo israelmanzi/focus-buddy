@@ -44,12 +44,18 @@ fun skinColors(skin: String): SkinColors = when (skin) {
 }
 
 /**
+ * False while the host says the scene is off screen (Android activity stopped). The animation
+ * clock stops then, so a backgrounded app draws nothing.
+ */
+val LocalAnimationActive = androidx.compose.runtime.staticCompositionLocalOf { true }
+
+/**
  * Seconds since first composition, ticking [fps] times a second. A delay loop rather than
  * withFrameNanos: awaiting frames keeps the compositor running at the display rate even when
  * nothing changed, which burns a whole core while the app sits idle.
  */
 @Composable
-fun rememberSeconds(fps: Int = 12, active: Boolean = true): State<Float> {
+fun rememberSeconds(fps: Int = 8, active: Boolean = true): State<Float> {
     val s = remember { mutableFloatStateOf(0f) }
     LaunchedEffect(fps, active) {
         if (!active) return@LaunchedEffect

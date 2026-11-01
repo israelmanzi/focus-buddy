@@ -86,12 +86,20 @@ android {
     packaging {
         resources.excludes += setOf("META-INF/INDEX.LIST", "META-INF/io.netty.versions.properties", "META-INF/DEPENDENCIES")
     }
+    androidResources {
+        // Only the desktop tray reads this drawable; aapt drops it from the phone APK.
+        ignoreAssetsPattern = "focus_buddy.png"
+    }
 }
 
 compose.desktop {
     application {
         mainClass = "buddy.app.MainKt"
-        jvmArgs += listOf("--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED")
+        jvmArgs += listOf(
+            "-Xms64m", "-Xmx256m",
+            "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1",
+            "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
+        )
         nativeDistributions {
             targetFormats(TargetFormat.Rpm, TargetFormat.Deb, TargetFormat.AppImage)
             packageName = "focus-buddy"
