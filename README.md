@@ -30,9 +30,10 @@ Install the APK with `adb install -r composeApp-release.apk` or by opening it on
 
 ## Sync
 
-1. Put the server, laptop and phone on one Tailscale network.
-2. Run `deploy/install-server.sh <host>`; it prints a URL and token.
-3. In each app: Settings → Sync → enter URL and token → Save & sync.
+1. Run `deploy/install-server.sh <host> --funnel` on the VPS. It prints an HTTPS URL
+   (`https://<host>.<tailnet>.ts.net`) and token that work from anywhere; without `--funnel`
+   the server stays reachable only inside your Tailscale network.
+2. In each app: Settings → Sync → enter the URL and token → Save.
 
 Data is an append-only event log, so devices merge without conflicts; each device also works
 fully offline and catches up later. Backups (Settings → Backup) are plain JSON event logs.

@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 # Build the Focus Buddy sync server and install/update it on an Ubuntu host reachable over ssh.
 #
-#   deploy/install-server.sh <ssh-host>
+#   deploy/install-server.sh <ssh-host> [--funnel]
+#
+# With --funnel the service binds 127.0.0.1 and Tailscale Funnel publishes it over HTTPS at
+# https://<host>.<tailnet>.ts.net (clients then need no Tailscale app).
 #
 # Idempotent: re-run it to upgrade. The token in /etc/focus-buddy.env is generated once and
 # kept on later runs; BUDDY_HOST is refreshed to the host's current Tailscale IPv4 every time.
 set -euo pipefail
 
-if [ $# -ne 1 ] || [ -z "$1" ]; then
-    echo "usage: $0 <ssh-host>" >&2
+if [ $# -lt 1 ] || [ -z "$1" ]; then
+    echo "usage: $0 <ssh-host> [--funnel]" >&2
     exit 64
 fi
 HOST="$1"
+FUNNEL=false
+[ "${2:-}" = "--funnel" ] && FUNNEL=true
+PORT="${BUDDY_PORT:-8787}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 JAR="$ROOT/server/build/libs/focus-buddy-server.jar"
 UNIT="$ROOT/deploy/focus-buddy-server.service"
@@ -32,6 +38,7 @@ trap cleanup EXIT
 cat > "$LOCAL_TMP/remote-install.sh" <<'REMOTE'
 set -euo pipefail
 SRC="$1"
+FUNNEL="${2:-false}"
 ENV_FILE=/etc/focus-buddy.env
 export DEBIAN_FRONTEND=noninteractive
 
@@ -47,6 +54,7 @@ if [ -z "$TS_IP" ]; then
     exit 1
 fi
 echo "==> Tailscale IPv4: $TS_IP"
+if [ "$FUNNEL" = true ]; then BIND_HOST=127.0.0.1; else BIND_HOST="$TS_IP"; fi
 
 java_major() {
     local v
@@ -81,12 +89,12 @@ install -m 644 "$SRC/focus-buddy-server.service" /etc/systemd/system/focus-buddy
 if [ ! -f "$ENV_FILE" ]; then
     echo "==> Creating $ENV_FILE with a new token"
     token="$(head -c 32 /dev/urandom | od -An -v -tx1 | tr -d ' \n')"
-    (umask 077 && printf 'BUDDY_TOKEN=%s\nBUDDY_HOST=%s\nBUDDY_PORT=8787\n' "$token" "$TS_IP" > "$ENV_FILE")
+    (umask 077 && printf 'BUDDY_TOKEN=%s\nBUDDY_HOST=%s\nBUDDY_PORT=8787\n' "$token" "$BIND_HOST" > "$ENV_FILE")
 fi
 if grep -q '^BUDDY_HOST=' "$ENV_FILE"; then
-    sed -i "s/^BUDDY_HOST=.*/BUDDY_HOST=$TS_IP/" "$ENV_FILE"
+    sed -i "s/^BUDDY_HOST=.*/BUDDY_HOST=$BIND_HOST/" "$ENV_FILE"
 else
-    echo "BUDDY_HOST=$TS_IP" >> "$ENV_FILE"
+    echo "BUDDY_HOST=$BIND_HOST" >> "$ENV_FILE"
 fi
 chown root:root "$ENV_FILE"
 chmod 600 "$ENV_FILE"
@@ -99,7 +107,12 @@ systemctl daemon-reload
 systemctl enable --quiet focus-buddy-server.service
 systemctl restart focus-buddy-server.service
 
-URL="http://$TS_IP:$PORT"
+if [ "$FUNNEL" = true ]; then
+    DNS="$(tailscale status --json | sed -n 's/.*"DNSName": "\([^"]*\)".*/\1/p' | head -n1)"
+    URL="https://${DNS%.}"
+else
+    URL="http://$TS_IP:$PORT"
+fi
 ok=0
 for _ in $(seq 1 30); do
     if [ "$(curl -fsS --max-time 2 "$URL/health" 2>/dev/null || true)" = "ok" ]; then ok=1; break; fi
@@ -118,10 +131,18 @@ echo "  URL:   $URL"
 echo "  Token: $TOKEN"
 REMOTE
 
+if [ "$FUNNEL" = true ]; then
+    echo "==> Publishing over Tailscale Funnel"
+    ssh "$HOST" "sudo tailscale funnel --bg $PORT >/dev/null && tailscale funnel status | head -3" || {
+        echo "ERROR: could not enable Funnel. Enable it for this node in the Tailscale admin console" >&2
+        exit 1
+    }
+fi
+
 echo "==> Uploading to $HOST"
 REMOTE_TMP="$(ssh "$HOST" 'mktemp -d')"
 scp -q "$JAR" "$UNIT" "$LOCAL_TMP/remote-install.sh" "$HOST:$REMOTE_TMP/"
 
 if [ "$(ssh "$HOST" 'id -u')" = 0 ]; then SUDO=""; else SUDO="sudo"; fi
 # -t so sudo can prompt for a password if it needs one.
-ssh -t "$HOST" "$SUDO bash '$REMOTE_TMP/remote-install.sh' '$REMOTE_TMP'"
+ssh -t "$HOST" "$SUDO bash '$REMOTE_TMP/remote-install.sh' '$REMOTE_TMP' '$FUNNEL'"

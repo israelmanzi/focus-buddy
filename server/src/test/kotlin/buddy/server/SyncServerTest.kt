@@ -38,11 +38,15 @@ class SyncServerTest {
     private fun ev(id: String, device: String = "A", ts: Long = 1_000) =
         Event(id, device, ts, Payload.Buy("item-$id"))
 
-    private fun app(pageLimit: Int = PAGE_LIMIT, bodyLimit: Long = BODY_LIMIT, block: suspend ApplicationTestBuilder.() -> Unit) =
-        testApplication {
-            application { buddyModule(token, store, pageLimit, bodyLimit) }
-            block()
-        }
+    private fun app(
+        pageLimit: Int = PAGE_LIMIT,
+        bodyLimit: Long = BODY_LIMIT,
+        ratePerMinute: Int = 60,
+        block: suspend ApplicationTestBuilder.() -> Unit,
+    ) = testApplication {
+        application { buddyModule(token, store, pageLimit, bodyLimit, ratePerMinute) }
+        block()
+    }
 
     private suspend fun HttpClient.rawSync(body: String, auth: String? = token): HttpResponse =
         post("/v1/sync") {
@@ -175,6 +179,32 @@ class SyncServerTest {
         val res = client.rawSync(raw)
         assertEquals(HttpStatusCode.OK, res.status)
         assertTrue(res.bodyAsText().contains("\"type\":\"future\""))
+    }
+
+    @Test
+    fun rateLimitsPerClient() = app(ratePerMinute = 2) {
+        val client = createClient { }
+        val body = BuddyJson.encodeToString(SyncRequest.serializer(), SyncRequest(0, emptyList()))
+        val first = client.post("/v1/sync") {
+            bearerAuth(token); contentType(ContentType.Application.Json); setBody(body)
+            headers.append("X-Forwarded-For", "203.0.113.9")
+        }
+        val second = client.post("/v1/sync") {
+            bearerAuth(token); contentType(ContentType.Application.Json); setBody(body)
+            headers.append("X-Forwarded-For", "203.0.113.9")
+        }
+        val third = client.post("/v1/sync") {
+            bearerAuth(token); contentType(ContentType.Application.Json); setBody(body)
+            headers.append("X-Forwarded-For", "203.0.113.9")
+        }
+        val other = client.post("/v1/sync") {
+            bearerAuth(token); contentType(ContentType.Application.Json); setBody(body)
+            headers.append("X-Forwarded-For", "203.0.113.10")
+        }
+        assertEquals(HttpStatusCode.OK, first.status)
+        assertEquals(HttpStatusCode.OK, second.status)
+        assertEquals(HttpStatusCode.TooManyRequests, third.status)
+        assertEquals(HttpStatusCode.OK, other.status, "a different client has its own bucket")
     }
 
     @Test

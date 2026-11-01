@@ -8,7 +8,8 @@ import kotlin.system.exitProcess
 
 /**
  * Env config:
- *  BUDDY_TOKEN (required), BUDDY_HOST (127.0.0.1), BUDDY_PORT (8787), BUDDY_DB (./focus-buddy.db)
+ *  BUDDY_TOKEN (required), BUDDY_HOST (127.0.0.1), BUDDY_PORT (8787), BUDDY_DB (./focus-buddy.db),
+ *  BUDDY_RATE_PER_MIN (60): per-client request budget.
  */
 fun main() {
     val log = LoggerFactory.getLogger("buddy.server")
@@ -25,11 +26,12 @@ fun main() {
     val portStr = env["BUDDY_PORT"]?.trim()?.ifEmpty { null } ?: "8787"
     val port = portStr.toIntOrNull()?.takeIf { it in 1..65535 } ?: fail("invalid BUDDY_PORT: $portStr")
     val db = env["BUDDY_DB"]?.trim()?.ifEmpty { null } ?: "./focus-buddy.db"
+    val rate = env["BUDDY_RATE_PER_MIN"]?.trim()?.toIntOrNull()?.takeIf { it > 0 } ?: 60
 
     val store = EventStore(db)
     log.info("db={} events={} listening on http://{}:{}", db, store.count(), host, port)
     embeddedServer(CIO, port = port, host = host) {
         monitor.subscribe(ApplicationStopped) { store.close() }
-        buddyModule(token, store)
+        buddyModule(token, store, ratePerMinute = rate)
     }.start(wait = true)
 }

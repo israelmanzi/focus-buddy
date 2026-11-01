@@ -13,6 +13,7 @@ import io.ktor.server.auth.bearer
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.request.contentLength
 import io.ktor.server.request.receive
+import io.ktor.server.plugins.origin
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -36,6 +37,35 @@ const val PAGE_LIMIT = 5000
 const val BODY_LIMIT = 5L * 1024 * 1024
 
 private val log = LoggerFactory.getLogger("buddy.server")
+
+/**
+ * Small per-client token bucket. The server may be reachable from the public internet (Tailscale
+ * Funnel), so a leaked key should not allow hammering it. Keys are bounded to avoid a spoofed
+ * X-Forwarded-For growing the map.
+ */
+internal class RateLimiter(private val perMinute: Int, private val now: () -> Long = System::currentTimeMillis) {
+    private class Bucket(var tokens: Double, var updated: Long)
+    private val buckets = object : LinkedHashMap<String, Bucket>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bucket>) = size > 1024
+    }
+
+    fun allow(key: String): Boolean = synchronized(buckets) {
+        val t = now()
+        val b = buckets.getOrPut(key) { Bucket(perMinute.toDouble(), t) }
+        val refill = (t - b.updated) / 60_000.0 * perMinute
+        b.tokens = (b.tokens + refill).coerceAtMost(perMinute.toDouble())
+        b.updated = t
+        if (b.tokens < 1.0) false else { b.tokens -= 1.0; true }
+    }
+}
+
+/**
+ * Client address as seen through the Funnel proxy. The trusted proxy appends the real peer last,
+ * so take the last entry: a client-supplied prefix must not choose its own bucket.
+ */
+private fun clientKey(call: io.ktor.server.application.ApplicationCall): String =
+    call.request.headers["X-Forwarded-For"]?.substringAfterLast(',')?.trim()?.takeIf { it.isNotEmpty() }
+        ?: call.request.origin.remoteHost
 
 /**
  * Wire-identical to [buddy.core.SyncRequest], but events are kept as raw JSON objects so the
@@ -66,8 +96,10 @@ fun Application.buddyModule(
     store: EventStore,
     pageLimit: Int = PAGE_LIMIT,
     bodyLimit: Long = BODY_LIMIT,
+    ratePerMinute: Int = 60,
 ) {
     require(token.isNotEmpty()) { "token must not be empty" }
+    val limiter = RateLimiter(ratePerMinute)
     install(ContentNegotiation) { json(BuddyJson) }
     install(Authentication) {
         bearer("buddy") {
@@ -80,6 +112,9 @@ fun Application.buddyModule(
 
         authenticate("buddy") {
             post("/v1/sync") {
+                if (!limiter.allow(clientKey(call))) {
+                    return@post call.respondText("Too many requests", status = HttpStatusCode.TooManyRequests)
+                }
                 val len = call.request.contentLength()
                     ?: return@post call.respondText("Content-Length required", status = HttpStatusCode.LengthRequired)
                 if (len > bodyLimit) {
