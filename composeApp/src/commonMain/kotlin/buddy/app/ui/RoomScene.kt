@@ -55,13 +55,13 @@ class PipActor {
     var facing by mutableStateOf(1)
 }
 
-/** Animation frame used by the walk and the shared scene clock. */
-private const val FRAME_MS = 125L
+/** Walk steps reuse the scene clock's cadence. */
 
 @Composable
 fun rememberWanderingPip(enabled: Boolean): PipActor {
     val actor = remember { PipActor() }
-    LaunchedEffect(enabled) {
+    val fps = buddy.app.art.LocalAnimationFps.current
+    LaunchedEffect(enabled, fps) {
         if (!enabled) { actor.mood = Mood.IDLE; return@LaunchedEffect }
         while (true) {
             when (Random.nextInt(10)) {
@@ -73,7 +73,7 @@ fun rememberWanderingPip(enabled: Boolean): PipActor {
                     val i0 = actor.i
                     val j0 = actor.j
                     val dist = abs(ti - i0) + abs(tj - j0)
-                    val steps = ((dist * 5000).toLong() / FRAME_MS).coerceAtLeast(5L)
+                    val steps = ((dist * 5_000).toLong() / (1000L / fps)).coerceAtLeast(4L)
                     actor.mood = Mood.WALK
                     // Step the walk on the same 12 fps cadence as the clock: Animatable would
                     // request a vsync frame every 16 ms and keep the whole window repainting.
@@ -81,7 +81,7 @@ fun rememberWanderingPip(enabled: Boolean): PipActor {
                         val f = n.toFloat() / steps
                         actor.i = i0 + (ti - i0) * f
                         actor.j = j0 + (tj - j0) * f
-                        delay(FRAME_MS)
+                        delay(1000L / fps)
                     }
                     actor.mood = Mood.IDLE
                     delay(1500L + Random.nextLong(2500))

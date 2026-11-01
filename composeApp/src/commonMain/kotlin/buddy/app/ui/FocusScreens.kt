@@ -170,7 +170,7 @@ fun FocusSetup(controller: AppController, onClose: () -> Unit) {
 @Composable
 fun RunningScreen(controller: AppController, phase: Phase.Running) {
     val rs = phase.session
-    val now = rememberNowState(controller)
+    val now = rememberNowState(controller, periodMs = 1_000)
     val state by controller.state.collectAsState()
     val tagInfo = state.tags[rs.tag]
 
@@ -179,7 +179,7 @@ fun RunningScreen(controller: AppController, phase: Phase.Running) {
             Spacer(Modifier.height(Space.xxxl))
             RunningHint(rs, now)
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                PipView(state.style, Mood.READING, Modifier.size(260.dp, 260.dp))
+                PipView(state.style, Mood.READING, Modifier.size(260.dp, 260.dp), fps = 4)
             }
             tagInfo?.let { Chip(it.name, Color(it.color), true) {} }
             Spacer(Modifier.height(Space.lg))
@@ -298,14 +298,14 @@ fun BreakOffer(controller: AppController) {
 
 @Composable
 fun BreakScreen(controller: AppController, phase: Phase.OnBreak) {
-    val now = rememberNowState(controller)
+    val now = rememberNowState(controller, periodMs = 1_000)
     val state by controller.state.collectAsState()
     Box(Modifier.fillMaxSize().background(Ink.bgBottom)) {
         Column(Modifier.fillMaxSize().safeDrawingPadding().padding(Space.xxxl), horizontalAlignment = Alignment.CenterHorizontally) {
             Spacer(Modifier.height(Space.xxxl))
             Text(Strings.Session.breakBody, style = label(Type.button), textAlign = TextAlign.Center)
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                PipView(state.style, Mood.BREAK, Modifier.size(240.dp, 240.dp))
+                PipView(state.style, Mood.BREAK, Modifier.size(240.dp, 240.dp), fps = 4)
             }
             BreakClock(phase, now)
             Spacer(Modifier.height(Space.xxxl))

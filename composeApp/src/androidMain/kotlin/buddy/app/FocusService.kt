@@ -195,7 +195,7 @@ class FocusService : Service() {
 
     companion object {
         private const val TAG = "FocusService"
-        private const val POLL_MS = 700L
+        private const val POLL_MS = 1_200L
         private const val SLEEP_POLL_MS = 5_000L
         private const val EXTRA_ENDS = "endsAt"
         private const val EXTRA_STARTED = "startedAt"

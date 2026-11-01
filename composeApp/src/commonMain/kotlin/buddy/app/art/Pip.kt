@@ -49,28 +49,32 @@ fun skinColors(skin: String): SkinColors = when (skin) {
  */
 val LocalAnimationActive = androidx.compose.runtime.staticCompositionLocalOf { true }
 
+/** Frames per second for the scene clocks; hosts may lower it (Android uses 6). */
+val LocalAnimationFps = androidx.compose.runtime.staticCompositionLocalOf { 8 }
+
 /**
  * Seconds since first composition, ticking [fps] times a second. A delay loop rather than
  * withFrameNanos: awaiting frames keeps the compositor running at the display rate even when
  * nothing changed, which burns a whole core while the app sits idle.
  */
 @Composable
-fun rememberSeconds(fps: Int = 8, active: Boolean = true): State<Float> {
+fun rememberSeconds(fps: Int? = null, active: Boolean = true): State<Float> {
+    val rate = fps ?: LocalAnimationFps.current
     val s = remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(fps, active) {
+    LaunchedEffect(rate, active) {
         if (!active) return@LaunchedEffect
-        val step = 1000L / fps
+        val step = 1000L / rate
         while (true) {
             delay(step)
-            s.floatValue += 1f / fps
+            s.floatValue += 1f / rate
         }
     }
     return s
 }
 
 @Composable
-fun PipView(style: CompanionStyle, mood: Mood, modifier: Modifier = Modifier, facing: Int = 1) {
-    val t = rememberSeconds()
+fun PipView(style: CompanionStyle, mood: Mood, modifier: Modifier = Modifier, facing: Int = 1, fps: Int = 8) {
+    val t = rememberSeconds(fps = fps)
     Canvas(modifier) {
         drawPip(Offset(size.width / 2, size.height * 0.97f), size.height * 0.9f, style, mood, t.value, facing)
     }

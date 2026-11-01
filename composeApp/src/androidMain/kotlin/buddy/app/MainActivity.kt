@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.activity.result.contract.ActivityResultContracts
 import buddy.app.art.LocalAnimationActive
+import buddy.app.art.LocalAnimationFps
 import buddy.app.ui.App
 
 class MainActivity : ComponentActivity() {
@@ -34,7 +35,10 @@ class MainActivity : ComponentActivity() {
                 lifecycle.addObserver(observer)
                 onDispose { lifecycle.removeObserver(observer) }
             }
-            androidx.compose.runtime.CompositionLocalProvider(LocalAnimationActive provides active) {
+            androidx.compose.runtime.CompositionLocalProvider(
+                LocalAnimationActive provides active,
+                LocalAnimationFps provides 6,
+            ) {
                 App(controller)
             }
         }

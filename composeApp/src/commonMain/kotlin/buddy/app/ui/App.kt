@@ -125,7 +125,8 @@ fun App(controller: AppController, initialSheet: Sheet = Sheet.NONE, initialDeco
                     },
                 )
                 Box(Modifier.weight(1f).fillMaxWidth()) {
-                    RoomScene(
+                    // The session and break screens are opaque; drawing the room behind them is wasted.
+                    if (!busy) RoomScene(
                         roomId, state.equipped, state.style, actor, Modifier.fillMaxSize(),
                         showPip = !decorating, decorating = decorating, selectedSlot = pickingSlot?.id, preview = preview,
                         onSlotTap = { pickingSlot = it },
