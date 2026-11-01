@@ -81,7 +81,12 @@ fun App(controller: AppController, initialSheet: Sheet = Sheet.NONE, initialDeco
         val keyboard = remember { FocusRequester() }
         LaunchedEffect(Unit) { runCatching { keyboard.requestFocus() } }
 
-        val skyTime = buddy.app.art.rememberSeconds(active = sceneActive)
+        // Full rate only while Pip is moving; breathing and twinkling read fine at a third of it.
+        val moving = actor.mood == buddy.app.art.Mood.WALK || actor.mood == buddy.app.art.Mood.HAPPY ||
+            actor.mood == buddy.app.art.Mood.PHONE
+        val sceneFps = if (moving) buddy.app.art.LocalAnimationFps.current
+        else maxOf(2, buddy.app.art.LocalAnimationFps.current / 3)
+        val skyTime = buddy.app.art.rememberSeconds(fps = sceneFps, active = sceneActive)
         Box(
             Modifier.fillMaxSize()
                 .focusRequester(keyboard)

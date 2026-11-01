@@ -179,7 +179,7 @@ fun RunningScreen(controller: AppController, phase: Phase.Running) {
             Spacer(Modifier.height(Space.xxxl))
             RunningHint(rs, now)
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                PipView(state.style, Mood.READING, Modifier.size(260.dp, 260.dp), fps = 4)
+                PipView(state.style, Mood.READING, Modifier.size(260.dp, 260.dp), fps = 2)
             }
             tagInfo?.let { Chip(it.name, Color(it.color), true) {} }
             Spacer(Modifier.height(Space.lg))
