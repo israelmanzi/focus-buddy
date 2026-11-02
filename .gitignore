@@ -9,3 +9,9 @@ docs/reference/
 release/
 focus-buddy.db*
 .claude/
+
+# JVM crash dumps and core files
+hs_err_pid*.log
+replay_pid*.log
+core.[0-9]*
+*.hprof
