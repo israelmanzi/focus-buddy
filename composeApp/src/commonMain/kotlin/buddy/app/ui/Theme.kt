@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.datetime.toLocalDateTime
 
 /** The hand-drawn palette. Every colour in the UI comes from here. */
 object Ink {
@@ -129,7 +130,7 @@ fun label(size: TextUnit = Type.bodyLarge, weight: FontWeight = FontWeight.Bold,
     TextStyle(fontSize = size, fontWeight = weight, color = color, letterSpacing = 0.5.sp)
 
 
-/** The sky outside the room, by local hour. */
+/** The sky outside the room. */
 data class Sky(
     val top: Color,
     val bottom: Color,
@@ -137,9 +138,27 @@ data class Sky(
     val isNight: Boolean,
 )
 
-fun skyFor(hour: Int): Sky = when (hour) {
-    in 5..6 -> Sky(Color(0xFFF3B9A0), Color(0xFFFFE3C7), Color(0xFFFFD79A), false)   // dawn
-    in 7..16 -> Sky(Color(0xFFBFE3E0), Color(0xFFE9F4EC), Color(0xFFF4D06F), false)  // day
-    in 17..19 -> Sky(Color(0xFFE8A87C), Color(0xFFF6D7B0), Color(0xFFF08A5D), false) // dusk
-    else -> Sky(Color(0xFF1E2A44), Color(0xFF33415C), Color(0xFFF4EBD0), true)       // night
+/**
+ * Sky for the given moment. Sunrise and sunset come from a seasonal daylight model (12 h +/-
+ * 2.5 h of daylight around the equinoxes), not fixed clock hours, so an autumn evening turns dark
+ * when the sun actually sets. Northern-hemisphere approximation: the tropics and the southern
+ * hemisphere will be off by up to an hour or two.
+ */
+fun skyFor(nowMs: Long, tz: kotlinx.datetime.TimeZone = kotlinx.datetime.TimeZone.currentSystemDefault()): Sky {
+    val local = kotlin.time.Instant.fromEpochMilliseconds(nowMs).toLocalDateTime(tz)
+    val daylight = 12.0 + 2.5 * kotlin.math.cos(2 * Math.PI * (local.date.dayOfYear - 172) / 365.0)
+    val sunrise = 12.0 - daylight / 2
+    val sunset = 12.0 + daylight / 2
+    val h = local.hour + local.minute / 60.0
+    val twilight = 0.75
+    return when {
+        h >= sunrise - twilight && h < sunrise + twilight ->
+            Sky(Color(0xFFF3B9A0), Color(0xFFFFE3C7), Color(0xFFFFD79A), false)   // dawn
+        h >= sunrise + twilight && h < sunset - twilight ->
+            Sky(Color(0xFFBFE3E0), Color(0xFFE9F4EC), Color(0xFFF4D06F), false)   // day
+        h >= sunset - twilight && h < sunset + twilight ->
+            Sky(Color(0xFFE8A87C), Color(0xFFF6D7B0), Color(0xFFF08A5C), false)   // dusk
+        else ->
+            Sky(Color(0xFF1E2A44), Color(0xFF33415C), Color(0xFFF4EBD0), true)    // night
+    }
 }

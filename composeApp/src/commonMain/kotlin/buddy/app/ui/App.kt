@@ -26,9 +26,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Instant
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,15 +58,15 @@ fun App(controller: AppController, initialSheet: Sheet = Sheet.NONE, initialDeco
         var preview by remember { mutableStateOf<Pair<String, Catalog.DecorItem?>?>(null) }
         var line by remember { mutableStateOf(Strings.Home.idleLines.random()) }
 
-        // The sky follows the wall clock; a minute is plenty of resolution.
-        var hour by remember { mutableStateOf(localHour(controller.now())) }
+        // The sky follows the wall clock and the season; a minute is plenty of resolution.
+        var clockNow by remember { mutableStateOf(controller.now()) }
         LaunchedEffect(Unit) {
             while (true) {
-                hour = localHour(controller.now())
+                clockNow = controller.now()
                 delay(60_000)
             }
         }
-        val sky = skyFor(hour)
+        val sky = skyFor(clockNow)
 
         val busy = phase !is Phase.Idle
         val focused = androidx.compose.ui.platform.LocalWindowInfo.current.isWindowFocused
@@ -208,9 +205,6 @@ private fun SyncDot(controller: AppController, night: Boolean) {
         Text(text, style = label(Type.foot, color = Ink.muted))
     }
 }
-
-private fun localHour(nowMs: Long): Int =
-    Instant.fromEpochMilliseconds(nowMs).toLocalDateTime(TimeZone.currentSystemDefault()).hour
 
 
 /** Sun, moon and stars; drawn on the window background above the app gradient. */

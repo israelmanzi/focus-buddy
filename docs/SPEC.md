@@ -30,6 +30,8 @@ reference and is git-ignored.
   a count-up session can no longer "complete" at the six-hour cap while the app was dead.
 - Abandons under 10 % of the plan (or under five minutes for count-up) are discarded, not recorded.
 - Desktop: leaving the window does not fail a session (you work in other apps there).
+- The room sky follows local time and season: sunrise/sunset are modelled from the day of the year
+  (northern-hemisphere approximation), so evenings turn dark when the sun actually sets.
 - Deep Focus (Android): during a session, opening a blocked app shows a full-screen overlay
   that sends you back. Block list *or* allow list mode.
 - Breaks: after completion, offer a 5/10/15-min break or skip.
