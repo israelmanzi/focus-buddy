@@ -25,6 +25,10 @@ reference and is git-ignored.
 - First 10 s: "Cancel (n)" with no penalty. After that: "Give up" ends the session as abandoned.
 - Leaving the app (Android): grace period (default 20 s, configurable); a notification nudges you
   back. Past the grace period the session is abandoned and Pip is sad.
+- A running session writes a heartbeat every 30 s. If the process dies (crash, force stop, reboot),
+  the next launch ends the session at its last heartbeat instead of letting wall-clock time run:
+  a count-up session can no longer "complete" at the six-hour cap while the app was dead.
+- Abandons under 10 % of the plan (or under five minutes for count-up) are discarded, not recorded.
 - Desktop: leaving the window does not fail a session (you work in other apps there).
 - Deep Focus (Android): during a session, opening a blocked app shows a full-screen overlay
   that sends you back. Block list *or* allow list mode.
@@ -56,6 +60,8 @@ reference and is git-ignored.
   backup export/import (JSON file).
 
 ## Data and sync
+- A `revoke` event withdraws an earlier session event on every device (used to remove test or
+  mistaken sessions); revoked sessions are ignored by the fold, so acorns and stats follow.
 - State is an append-only **event log**: each event has a UUID, device id, timestamp and a
   payload (session completed/abandoned, item bought, slot equipped, room unlocked, skin bought,
   companion edited, tag created/edited/deleted).

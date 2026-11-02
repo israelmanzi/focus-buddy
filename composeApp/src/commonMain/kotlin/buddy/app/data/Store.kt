@@ -48,6 +48,8 @@ data class RunningSession(
     val tag: String,
     val deepFocus: Boolean,
     val awaySince: Long? = null,
+    /** Last time the process was known alive while this session ran. */
+    val lastHeartbeat: Long? = null,
 )
 
 @Serializable

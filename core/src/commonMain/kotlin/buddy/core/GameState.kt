@@ -71,7 +71,8 @@ data class GameState(
             is Payload.Buy -> 2
             is Payload.Style -> 3
             is Payload.Equip -> 4
-            Payload.Unknown -> 5
+            is Payload.Revoke -> 5
+            Payload.Unknown -> 6
         }
 
         val eventOrder = compareBy<Event>({ it.ts }, { rank(it) }, { it.id })
@@ -87,8 +88,12 @@ data class GameState(
             val ordered = events.sortedWith(eventOrder)
             val unique = if (ordered.size < 2) ordered else dedupe(ordered)
             // One linear pass per phase: nothing is copied per event, so a large log folds in O(n).
+            // Revocations are global, not ordered: a session removed on one device must vanish on all.
+            val revoked = unique.filter { it.payload is Payload.Revoke }.mapTo(HashSet()) {
+                (it.payload as Payload.Revoke).target
+            }
             val b = Builder()
-            for (e in unique) if (e.payload is Payload.Session) b.apply(e)
+            for (e in unique) if (e.payload is Payload.Session && e.id !in revoked) b.apply(e)
             for (e in unique) if (e.payload !is Payload.Session) b.apply(e)
             return b.build()
         }
@@ -152,6 +157,7 @@ data class GameState(
                         }
                     }
                     is Payload.Tag -> tags[p.tagId] = TagInfo(p.tagId, p.name.take(24), p.color, p.archived)
+                    is Payload.Revoke -> Unit
                     Payload.Unknown -> Unit
                 }
             }

@@ -57,6 +57,11 @@ sealed interface Payload {
         val face: String? = null,
     ) : Payload
 
+    /** Withdraws an earlier session event (a test session, or one that should not count). */
+    @Serializable
+    @SerialName("revoke")
+    data class Revoke(val target: String) : Payload
+
     @Serializable
     @SerialName("tag")
     data class Tag(val tagId: String, val name: String, val color: Long, val archived: Boolean = false) : Payload

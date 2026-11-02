@@ -61,8 +61,11 @@ class AppControllerTest {
     @Test
     fun completesSessionThatEndedWhileTheProcessWasDead() {
         val started = 1_000_000L
-        Store(dir).saveMeta(DeviceMeta("dev", running = RunningSession(started, 25, false, Rules.DEFAULT_TAG, false)))
-        now = started + 30 * 60_000L
+        // The process was alive until 30 minutes in, so the planned end really did happen.
+        Store(dir).saveMeta(
+            DeviceMeta("dev", running = RunningSession(started, 25, false, Rules.DEFAULT_TAG, false, lastHeartbeat = started + 30 * 60_000L)),
+        )
+        now = started + 40 * 60_000L
         val c = controller()
         val rec = c.state.value.sessions.single()
         assertTrue(rec.session.completed)
@@ -73,12 +76,56 @@ class AppControllerTest {
     }
 
     @Test
+    fun staleCountUpSessionEndsAtItsLastHeartbeat() {
+        val started = 1_000_000L
+        val beat = started + 120_000L
+        Store(dir).saveMeta(
+            DeviceMeta(
+                "dev",
+                running = RunningSession(
+                    startedAt = started, plannedMin = 0, countUp = true,
+                    tag = Rules.DEFAULT_TAG, deepFocus = false, lastHeartbeat = beat,
+                ),
+            ),
+        )
+        // Six hours later, like the phantom session that auto-completed at the cap.
+        now = beat + 6 * 60 * 60_000L
+        val c = controller()
+        assertEquals(0, c.state.value.acorns)
+        assertTrue(c.state.value.sessions.isEmpty(), "a dead count-up session must not mint six hours")
+        assertEquals(0L, c.state.value.earnedTotal.toLong())
+    }
+
+    @Test
+    fun staleCountdownThatFinishedBeforeTheCrashStillCounts() {
+        val started = 1_000_000L
+        val plannedEnd = started + 25 * 60_000L
+        Store(dir).saveMeta(
+            DeviceMeta(
+                "dev",
+                running = RunningSession(
+                    startedAt = started, plannedMin = 25, countUp = false,
+                    tag = Rules.DEFAULT_TAG, deepFocus = false, lastHeartbeat = plannedEnd + 5_000L,
+                ),
+            ),
+        )
+        now = plannedEnd + 60 * 60_000L
+        val c = controller()
+        val rec = c.state.value.sessions.single()
+        assertEquals(true, rec.session.completed)
+        assertEquals(25L * 60, rec.session.focusedSec)
+    }
+
+    @Test
     fun abandonsSessionWhoseGraceRanOutWhileDead() {
         val started = 1_000_000L
         // 200 s of a 25 minute plan is over the 10 % discard threshold.
         val away = started + 200_000L
         Store(dir).saveMeta(
-            DeviceMeta("dev", running = RunningSession(started, 25, false, Rules.DEFAULT_TAG, false, awaySince = away)),
+            DeviceMeta(
+                "dev",
+                running = RunningSession(started, 25, false, Rules.DEFAULT_TAG, false, awaySince = away, lastHeartbeat = away),
+            ),
         )
         now = started + 40 * 60_000L
         val c = controller()
@@ -95,7 +142,14 @@ class AppControllerTest {
         val started = 1_000_000L
         val away = started + 25 * 60_000L - 10_000L // grace ends ten seconds after the planned end
         Store(dir).saveMeta(
-            DeviceMeta("dev", running = RunningSession(started, 25, false, Rules.DEFAULT_TAG, false, awaySince = away)),
+            // Alive one second past the planned end, so the completion is genuine.
+            DeviceMeta(
+                "dev",
+                running = RunningSession(
+                    started, 25, false, Rules.DEFAULT_TAG, false,
+                    awaySince = away, lastHeartbeat = started + 25 * 60_000L + 1_000L,
+                ),
+            ),
         )
         now = started + 60 * 60_000L
         val c = controller()

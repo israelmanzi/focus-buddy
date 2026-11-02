@@ -47,6 +47,21 @@ class GameStateTest {
         assertEquals(GameState.fold(evs), GameState.fold(evs.reversed()))
     }
 
+    @Test fun revokedSessionsAreIgnoredInEitherOrder() {
+        val session = ev(1, session(100))
+        val revoke = ev(2, Payload.Revoke(session.id))
+        val forward = GameState.fold(listOf(session, revoke))
+        val backward = GameState.fold(listOf(revoke, session))
+        assertEquals(0, forward.acorns)
+        assertTrue(forward.sessions.isEmpty())
+        assertEquals(forward, backward)
+    }
+
+    @Test fun revokingAnUnknownIdIsHarmless() {
+        val s = GameState.fold(listOf(ev(1, session(50)), ev(2, Payload.Revoke("nope"))))
+        assertEquals(1, s.sessions.size)
+    }
+
     @Test fun eventsRoundTripThroughJson() {
         val e = ev(1, session(25))
         assertEquals(e, BuddyJson.decodeFromString(Event.serializer(), BuddyJson.encodeToString(Event.serializer(), e)))

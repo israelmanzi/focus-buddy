@@ -26,6 +26,10 @@ import java.util.UUID
 
 private const val SYNC_BATCH_EVENTS = 1_000
 
+/** A persisted session with no heartbeat for this long is treated as ended at the last beat. */
+private const val STALE_RESUME_MS = 5 * 60_000L
+private const val HEARTBEAT_MS = 30_000L
+
 sealed interface Phase {
     data object Idle : Phase
     data class Running(val session: RunningSession) : Phase
@@ -103,7 +107,7 @@ class AppController(
         if (_phase.value is Phase.Running) return
         cancelBreak()
         val planned = if (countUp) 0 else minutes.coerceIn(Rules.MIN_MINUTES, Rules.MAX_MINUTES)
-        val rs = RunningSession(clock(), planned, countUp, tag, deepFocus)
+        val rs = RunningSession(clock(), planned, countUp, tag, deepFocus, lastHeartbeat = clock())
         updateSettings { it.copy(defaultMinutes = if (countUp) it.defaultMinutes else planned, countUp = countUp, lastTag = tag, deepFocus = deepFocus) }
         saveMeta(meta.copy(running = rs, breakEndsAt = null))
         _phase.value = Phase.Running(rs)
@@ -158,6 +162,15 @@ class AppController(
     }
 
     private fun resume(rs: RunningSession) {
+        // If the process was dead (crash, force stop, reboot), do not let a count-up session keep
+        // running in wall-clock time and later "complete" at the six-hour cap.
+        val lastAlive = rs.lastHeartbeat ?: rs.startedAt
+        if (clock() - lastAlive > STALE_RESUME_MS) {
+            val plannedEnd = SessionLogic.plannedEnd(rs)
+            val endedAt = if (plannedEnd != null) minOf(lastAlive, plannedEnd) else lastAlive
+            finish(rs, endedAt, completed = plannedEnd != null && endedAt >= plannedEnd)
+            return
+        }
         _phase.value = Phase.Running(rs)
         if (!checkSession(rs)) {
             val s = _settings.value
@@ -175,6 +188,11 @@ class AppController(
             while (isActive) {
                 val rs = (_phase.value as? Phase.Running)?.session ?: break
                 if (checkSession(rs)) break
+                if (clock() - (rs.lastHeartbeat ?: rs.startedAt) >= HEARTBEAT_MS) {
+                    val beat = rs.copy(lastHeartbeat = clock())
+                    _phase.value = Phase.Running(beat)
+                    saveMeta(meta.copy(running = beat))
+                }
                 delay(500)
             }
         }
@@ -191,8 +209,10 @@ class AppController(
 
     private fun finish(rs: RunningSession, endedAt: Long, completed: Boolean) {
         val sec = ((endedAt - rs.startedAt) / 1000).coerceAtLeast(0)
-        // Abandoning before 10 % of the planned time leaves no trace: no sad card, no stats entry.
-        if (!completed && rs.plannedMin > 0 && sec * 10 < rs.plannedMin * 60L) {
+        // Abandoning early leaves no trace: no sad card, no stats entry. 10 % of the plan for a
+        // count-down session, the five-minute earning minimum for a count-up one.
+        val tooShort = if (rs.plannedMin > 0) sec * 10 < rs.plannedMin * 60L else sec < Rules.MIN_MINUTES * 60L
+        if (!completed && tooShort) {
             endSession(rs, null)
             _phase.value = Phase.Idle
             return
@@ -269,6 +289,9 @@ class AppController(
     }
 
     fun equip(slot: String, item: String?) = emit(Payload.Equip(slot, item))
+
+    /** Withdraws a recorded session on every synced device (acorns and stats follow the fold). */
+    fun revokeSession(eventId: String) = emit(Payload.Revoke(eventId))
 
     fun setStyle(name: String, skin: String, hat: String?, neck: String?, face: String?) =
         emit(Payload.Style(name, skin, hat, neck, face))
