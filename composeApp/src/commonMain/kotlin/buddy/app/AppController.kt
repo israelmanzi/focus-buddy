@@ -330,6 +330,12 @@ class AppController(
         syncJob = scope.launch { delay(2_000); syncNow() }
     }
 
+    /** Forgets the sync cursor so the next sync pulls the whole log again (repairs missed events). */
+    fun resyncFromScratch() {
+        saveMeta(meta.copy(syncCursor = 0))
+        scope.launch { syncNow() }
+    }
+
     suspend fun syncNow() {
         val s = _settings.value
         if (s.syncUrl.isBlank() || _sync.value == SyncStatus.Syncing) return

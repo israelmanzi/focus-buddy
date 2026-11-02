@@ -75,12 +75,26 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    // CI provides a real key through BUDDY_KEYSTORE + passwords; local builds fall back to the
+    // debug key so `assembleRelease` keeps working without secrets. Note: an APK signed with a
+    // different key cannot be installed over an existing one.
+    val ciKeystore = System.getenv("BUDDY_KEYSTORE")?.let { file(it) }
+    signingConfigs {
+        if (ciKeystore != null && ciKeystore.exists()) {
+            create("release") {
+                storeFile = ciKeystore
+                storePassword = System.getenv("BUDDY_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("BUDDY_KEY_ALIAS") ?: "focus-buddy"
+                keyPassword = System.getenv("BUDDY_KEY_PASSWORD") ?: System.getenv("BUDDY_KEYSTORE_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         getByName("release") {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     packaging {

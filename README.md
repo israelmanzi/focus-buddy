@@ -46,6 +46,26 @@ fully offline and catches up later. Backups (Settings → Backup) are plain JSON
 - Closing the window quits. A StatusNotifierItem tray icon (XFCE, KDE, GNOME with an SNI extension) offers open/start/stop/quit with a transparent icon; it is simply absent where no StatusNotifier host runs.
 - Session-finished and break-over notifications use the freedesktop notification service.
 
+## Releases (CI)
+
+`.github/workflows/release.yml` builds, on every `v*` tag (or manually from Actions):
+
+- `focus-buddy.apk` (release, R8)
+- `focus-buddy-*.rpm` and `.deb` for Linux desktop (jpackage)
+- the desktop uber jar and `focus-buddy-server.jar`
+- `SHA256SUMS`, published as a GitHub release
+
+Add `BUDDY_KEYSTORE_BASE64`, `BUDDY_KEYSTORE_PASSWORD`, `BUDDY_KEY_ALIAS` and
+`BUDDY_KEY_PASSWORD` as repository secrets to sign the APK with your own key. Without them the
+APK is debug-signed: installable, but it cannot be installed over a differently signed build.
+
+## Who owns the data
+
+Every install starts empty and private: the event log lives in the app's own storage, nothing is
+bundled in the APK or the packages. Sync is opt-in and blank by default. The sync server is
+single-user: anyone who enters its URL and token merges into the same event log, so treat the
+token as the account. For another person, deploy another server (`deploy/install-server.sh`).
+
 ## Sounds
 
 All audio is synthesized at runtime (no asset files): a chime on start, a three-note finish, a

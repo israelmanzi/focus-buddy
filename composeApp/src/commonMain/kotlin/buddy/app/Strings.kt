@@ -180,6 +180,8 @@ object Strings {
         const val dotSyncing = "syncing"
         const val dotSynced = "synced"
         const val dotOffline = "offline"
+        /** Pulls the whole log again; repairs a device that missed events. */
+        const val resync = "Re-download everything"
     }
 
     object Backup {

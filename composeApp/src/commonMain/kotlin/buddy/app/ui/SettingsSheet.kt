@@ -114,6 +114,10 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
                         scope.launch { controller.syncNow() }
                     }
                     Spacer(Modifier.width(Space.lg))
+                    ChunkyButton(Strings.Sync.resync, fontSize = Type.foot, padding = PaddingValues(Space.lg, Space.sm)) {
+                        controller.resyncFromScratch()
+                    }
+                    Spacer(Modifier.width(Space.lg))
                     Text(
                         when (val v = sync) {
                             SyncStatus.Off -> Strings.Sync.off
