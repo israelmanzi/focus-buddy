@@ -33,8 +33,8 @@ private const val HEARTBEAT_MS = 30_000L
 sealed interface Phase {
     data object Idle : Phase
     data class Running(val session: RunningSession) : Phase
-    data class Interrupted(val focusedMin: Int, val acorns: Int = 0) : Phase
-    data class Rewarded(val acorns: Int, val minutes: Int) : Phase
+    data class Interrupted(val focusedMin: Int, val acorns: Int = 0, val pausedMin: Int = 0) : Phase
+    data class Rewarded(val acorns: Int, val minutes: Int, val pausedMin: Int = 0) : Phase
     data object BreakOffer : Phase
     data class OnBreak(val endsAt: Long) : Phase
 }
@@ -136,18 +136,34 @@ class AppController(
     }
 
     /**
-     * Leaving the app is allowed: research, notes and other work keep the session counting.
-     * Only Deep Focus restricts apps, through the foreground service.
+     * Leaving pauses the timer: the time away is not counted and scales the final reward down.
+     * Deep Focus sessions are not paused; the blocker handles other apps.
      */
     fun onAppBackgrounded() {
         val rs = (_phase.value as? Phase.Running)?.session ?: return
-        saveMeta(meta.copy(running = rs.copy(lastHeartbeat = clock())))
+        if (!platform.leavingAppInterrupts || rs.deepFocus || rs.awaySince != null) return
+        val away = rs.copy(awaySince = clock(), lastHeartbeat = clock())
+        saveMeta(meta.copy(running = away))
+        _phase.value = Phase.Running(away)
+        platform.onSessionPaused()
     }
 
     fun onAppForegrounded() {
         val rs = (_phase.value as? Phase.Running)?.session ?: return
-        saveMeta(meta.copy(running = rs.copy(lastHeartbeat = clock())))
-        checkSession(rs)
+        val awayAt = rs.awaySince
+        if (awayAt == null) { checkSession(rs); return }
+        val now = clock()
+        val paused = (now - awayAt).coerceAtLeast(0)
+        val back = rs.copy(
+            startedAt = rs.startedAt + paused,
+            awayTotalMs = rs.awayTotalMs + paused,
+            awaySince = null,
+            lastHeartbeat = now,
+        )
+        saveMeta(meta.copy(running = back))
+        _phase.value = Phase.Running(back)
+        platform.onSessionResumed()
+        checkSession(back)
     }
 
     fun dismissResult() {
@@ -220,11 +236,15 @@ class AppController(
             _phase.value = Phase.Idle
             return
         }
-        val session = Payload.Session(rs.startedAt, endedAt, rs.plannedMin, sec, rs.tag, completed, rs.deepFocus)
+        val session = Payload.Session(
+            rs.startedAt, endedAt, rs.plannedMin, sec, rs.tag, completed, rs.deepFocus,
+            awaySec = rs.awayTotalMs / 1000,
+        )
         val reward = Rules.reward(session)
         endSession(rs, session)
+        val pausedMin = (rs.awayTotalMs / 60_000L).toInt()
         _phase.value = if (completed && reward > 0) {
-            Phase.Rewarded(reward, (sec / 60).toInt()).also {
+            Phase.Rewarded(reward, (sec / 60).toInt(), pausedMin).also {
                 platform.showNotification(
                     Strings.Notifications.completeTitle,
                     Strings.Notifications.completeBody(reward, (sec / 60).toInt()),
@@ -233,7 +253,7 @@ class AppController(
         } else {
             // Abandoned, or too short to earn: never show the celebration card for it. Any minutes
             // already focused are still paid and shown on the sad card.
-            Phase.Interrupted((sec / 60).toInt(), reward).also {
+            Phase.Interrupted((sec / 60).toInt(), reward, pausedMin).also {
                 platform.showNotification(Strings.Notifications.endedTitle, Strings.Notifications.endedBody)
             }
         }

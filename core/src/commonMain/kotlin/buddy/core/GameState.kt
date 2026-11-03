@@ -1,6 +1,7 @@
 package buddy.core
 
 import kotlin.math.ceil
+import kotlin.math.floor
 
 object Rules {
     const val MIN_MINUTES = 5
@@ -18,9 +19,15 @@ object Rules {
     fun reward(s: Payload.Session): Int {
         // Clamp before the Long→Int conversion: crafted or corrupted events must not overflow into
         // a negative reward (which would take acorns away).
-        val minutes = (s.focusedSec / 60).coerceIn(0, MAX_MINUTES.toLong()).toInt()
+        val focus = s.focusedSec.coerceAtLeast(0)
+        val away = s.awaySec.coerceAtLeast(0)
+        val minutes = (focus / 60).coerceIn(0, MAX_MINUTES.toLong()).toInt()
         if (minutes < MIN_MINUTES) return 0
-        return if (s.completed) minutes + ceil(minutes * COMPLETION_BONUS).toInt() else minutes
+        val base = if (s.completed) minutes + ceil(minutes * COMPLETION_BONUS).toInt() else minutes
+        if (away <= 0) return base
+        // Pauses are not free: the payout is scaled by the share of the session spent focusing.
+        val share = focus.toDouble() / (focus + away).toDouble()
+        return floor(base * share).toInt().coerceAtLeast(0)
     }
 
     /**
@@ -31,6 +38,7 @@ object Rules {
     fun validSession(s: Payload.Session): Boolean {
         if (s.focusedSec !in 0..(MAX_MINUTES * 60L)) return false
         if (s.endedAt < s.startedAt) return false
+        if (s.awaySec !in 0..(MAX_MINUTES * 60L)) return false
         if (s.plannedMin == 0) return true
         if (s.plannedMin !in MIN_MINUTES..MAX_MINUTES) return false
         return s.focusedSec <= s.plannedMin * 60L

@@ -73,6 +73,7 @@ object Strings {
             "We focused for $minutes, but the session ended early. No acorns this time. Shall we try again?"
         const val interruptedEarly = "The session ended before it really started. Let's try again?"
         fun interruptedKept(acorns: Int) = "You keep $acorns acorns for the time you focused."
+        fun pausedPenalty(minutes: Int) = "Paused for ${formatPaused(minutes)}; earnings scaled down."
         const val okay = "Okay"
         const val breakTitle = "Tea break?"
         fun breakMinutes(minutes: Int) = "$minutes min"
@@ -150,10 +151,11 @@ object Strings {
         const val grantPermissions = "Grant permissions"
         const val blockChosen = "Block chosen apps"
         const val allowOnly = "Allow only chosen"
-        fun appsChosen(count: Int) = "$count ${appCount(count)} chosen"
+        fun appsChosen(count: Int) = "${appCount(count)} chosen"
         const val chooseApps = "Choose apps"
-        const val restore = "restore"
-        const val hide = "hide"
+        const val restore = "Restore"
+        const val remove = "Remove"
+        const val removedTags = "Removed tags"
         const val tagsHint = "Add tags when starting a session."
         const val ambientMusic = "Ambient music while focusing"
         const val soundEffects = "Sound effects"
@@ -259,3 +261,7 @@ object Strings {
 private fun appCount(count: Int) = if (count == 1) "1 app" else "$count apps"
 
 private fun minuteCount(minutes: Int) = if (minutes == 1) "minute" else "minutes"
+
+/** Minutes as "12m" or "1h 05m", used in the pause penalty line. */
+internal fun formatPaused(minutes: Int): String =
+    if (minutes >= 60) "${minutes / 60}h ${(minutes % 60).toString().padStart(2, '0')}m" else "${minutes}m"

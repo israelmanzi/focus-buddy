@@ -80,6 +80,15 @@ fun App(controller: AppController, initialSheet: Sheet = Sheet.NONE, initialDeco
         val sceneActive = hostActive && focused
         val actor = rememberWanderingPip(enabled = !busy && !decorating && sheet == Sheet.NONE && sceneActive)
 
+        // Android back closes whatever is open instead of leaving the app.
+        PlatformBackHandler(enabled = pickingSlot != null || sheet != Sheet.NONE || decorating) {
+            when {
+                pickingSlot != null -> pickingSlot = null
+                sheet != Sheet.NONE -> sheet = Sheet.NONE
+                decorating -> decorating = false
+            }
+        }
+
         // Keyboard: Esc closes whatever is open, Space opens the focus sheet (desktop-friendly).
         val keyboard = remember { FocusRequester() }
         LaunchedEffect(Unit) { runCatching { keyboard.requestFocus() } }

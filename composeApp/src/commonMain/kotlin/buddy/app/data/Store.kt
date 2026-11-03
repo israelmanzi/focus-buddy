@@ -50,6 +50,8 @@ data class RunningSession(
     val awaySince: Long? = null,
     /** Last time the process was known alive while this session ran. */
     val lastHeartbeat: Long? = null,
+    /** Accumulated time spent paused; excluded from focus and used to scale the reward. */
+    val awayTotalMs: Long = 0,
 )
 
 @Serializable

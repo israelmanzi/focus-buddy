@@ -36,6 +36,8 @@ sealed interface Payload {
         val tag: String,
         val completed: Boolean,
         val deepFocus: Boolean = false,
+        /** Time spent paused during the session; reduces the reward proportionally. */
+        val awaySec: Long = 0,
     ) : Payload
 
     @Serializable

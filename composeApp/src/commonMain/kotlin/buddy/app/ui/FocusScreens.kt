@@ -272,6 +272,10 @@ fun InterruptedCard(controller: AppController, phase: Phase.Interrupted) {
                     style = label(Type.body, FontWeight.Bold, Ink.leafDark), textAlign = TextAlign.Center,
                 )
             }
+            if (phase.pausedMin > 0) {
+                Spacer(Modifier.height(Space.sm))
+                Text(Strings.Session.pausedPenalty(phase.pausedMin), style = label(Type.foot, FontWeight.Medium, Ink.muted), textAlign = TextAlign.Center)
+            }
             Spacer(Modifier.height(Space.xxl))
             ChunkyButton(Strings.Session.okay, color = Ink.butter) { controller.dismissResult() }
         }

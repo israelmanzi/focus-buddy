@@ -173,27 +173,32 @@ class SessionScenarioTest {
     }
 
     @Test
-    fun leavingKeepsTheTimerRunning() {
+    fun leavingPausesTheTimerAndScalesTheReward() {
         Harness().use { h ->
             h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
             h.advance(60_000)
             h.controller.onAppBackgrounded()
-            // Researching in Chrome or taking notes does not touch the session.
             val away = assertIs<Phase.Running>(h.phase())
-            assertEquals(null, away.session.awaySince)
+            assertNotNull(away.session.awaySince)
+            assertEquals(1, h.platform.callsNamed("onSessionPaused").size)
 
             h.advance(10 * 60_000L)
             assertIs<Phase.Running>(h.phase())
             h.controller.onAppForegrounded()
-            h.advance(14 * 60_000L)
+            assertEquals(1, h.platform.callsNamed("onSessionResumed").size)
+            h.advance(24 * 60_000L)
+
             val rewarded = assertIs<Phase.Rewarded>(h.phase())
-            assertEquals(30, rewarded.acorns)
+            // 25 focused minutes and 10 paused: 30 base acorns scaled by 25/35.
+            assertEquals(21, rewarded.acorns)
+            assertEquals(10, rewarded.pausedMin)
             assertEquals(25 * 60L, h.state().sessions.single().session.focusedSec)
+            assertEquals(10 * 60L, h.state().sessions.single().session.awaySec)
         }
     }
 
     @Test
-    fun switchingAppsBrieflyKeepsCounting() {
+    fun aBriefPauseBarelyReducesTheReward() {
         Harness().use { h ->
             h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
             h.advance(60_000)
@@ -203,22 +208,27 @@ class SessionScenarioTest {
             assertIs<Phase.Running>(h.phase())
 
             h.advance(24 * 60_000L)
-            assertIs<Phase.Rewarded>(h.phase())
-            assertEquals(25 * 60L, h.state().sessions.single().session.focusedSec)
+            val rewarded = assertIs<Phase.Rewarded>(h.phase())
+            // 25 minutes focused, 10 seconds paused: 30 * 1500/1510 rounds down to 29.
+            assertEquals(29, rewarded.acorns)
         }
     }
 
     @Test
-    fun theSessionCompletesWhileTheUserIsInAnotherApp() {
+    fun theSessionWaitsWhileTheUserIsInAnotherApp() {
         Harness().use { h ->
             h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
             h.advance(60_000)
             h.controller.onAppBackgrounded()
             h.advance(25 * 60_000L)
-            // The planned end arrives while Chrome is open; the session counts it.
+            // The planned end passed in wall-clock time, but the timer was paused.
+            assertIs<Phase.Running>(h.phase())
+
+            h.controller.onAppForegrounded()
+            h.advance(24 * 60_000L)
             val rewarded = assertIs<Phase.Rewarded>(h.phase())
-            assertEquals(30, rewarded.acorns)
             assertEquals(25 * 60L, h.state().sessions.single().session.focusedSec)
+            assertEquals(24 * 60L + 60L, h.state().sessions.single().session.awaySec)
         }
     }
 
@@ -289,15 +299,19 @@ class SessionScenarioTest {
     }
 
     @Test
-    fun leavingJustBeforeTheEndStillCompletes() {
+    fun leavingJustBeforeTheEndPausesUntilReturn() {
         Harness().use { h ->
             h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
             h.advance(25 * 60_000L - 5_000)
             h.controller.onAppBackgrounded()
             h.advance(5_000)
+            // Paused, so the plan has not ended yet.
+            assertIs<Phase.Running>(h.phase())
+            h.controller.onAppForegrounded()
+            h.advance(5_000)
             val rewarded = assertIs<Phase.Rewarded>(h.phase())
-            assertEquals(30, rewarded.acorns)
-            assertEquals(25 * 60L, h.state().sessions.single().session.focusedSec)
+            // Five seconds paused out of 25 minutes: 30 * 1500/1505 rounds down to 29.
+            assertEquals(29, rewarded.acorns)
         }
     }
 

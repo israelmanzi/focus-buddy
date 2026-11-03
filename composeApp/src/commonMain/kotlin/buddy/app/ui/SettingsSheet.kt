@@ -75,18 +75,37 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
                 }
             }
             Section(Strings.Settings.tagsSection) {
-                state.tags.values.forEach { t ->
+                val active = state.tags.values.filter { !it.archived }
+                val removed = state.tags.values.filter { it.archived }
+                active.forEach { t ->
                     Row(Modifier.fillMaxWidth().padding(vertical = Space.xxs), verticalAlignment = Alignment.CenterVertically) {
                         TagDot(Color(t.color))
                         Spacer(Modifier.width(Space.md))
-                        Text(t.name, style = label(Type.body, color = if (t.archived) Ink.muted else Ink.outline), modifier = Modifier.weight(1f))
-                        if (t.id != Rules.DEFAULT_TAG) Text(
-                            if (t.archived) Strings.Settings.restore else Strings.Settings.hide, style = label(Type.foot, color = Ink.muted),
-                            modifier = Modifier.tap { controller.upsertTag(t.id, t.name, t.color, !t.archived) }.padding(Space.sm),
-                        )
+                        Text(t.name, style = label(Type.body), modifier = Modifier.weight(1f))
+                        if (t.id != Rules.DEFAULT_TAG) {
+                            Text(
+                                Strings.Settings.remove, style = label(Type.foot, FontWeight.Bold, Ink.berry),
+                                modifier = Modifier.tap { controller.upsertTag(t.id, t.name, t.color, archived = true) }.padding(Space.sm),
+                            )
+                        }
                     }
                 }
                 Text(Strings.Settings.tagsHint, style = label(Type.foot, FontWeight.Medium, Ink.muted))
+                if (removed.isNotEmpty()) {
+                    Spacer(Modifier.height(Space.sm))
+                    Text(Strings.Settings.removedTags, style = label(Type.foot, FontWeight.Bold, Ink.muted))
+                    removed.forEach { t ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = Space.xxs), verticalAlignment = Alignment.CenterVertically) {
+                            TagDot(Color(t.color).copy(alpha = 0.45f))
+                            Spacer(Modifier.width(Space.md))
+                            Text(t.name, style = label(Type.body, color = Ink.muted), modifier = Modifier.weight(1f))
+                            Text(
+                                Strings.Settings.restore, style = label(Type.foot, FontWeight.Bold, Ink.leafDark),
+                                modifier = Modifier.tap { controller.upsertTag(t.id, t.name, t.color, archived = false) }.padding(Space.sm),
+                            )
+                        }
+                    }
+                }
             }
             Section(Strings.Settings.soundSection) {
                 Toggle(Strings.Settings.ambientMusic, s.music) { v -> controller.updateSettings { it.copy(music = v) } }
