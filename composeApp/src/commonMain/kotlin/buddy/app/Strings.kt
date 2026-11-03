@@ -57,6 +57,9 @@ object Strings {
 
     object Session {
         const val away = "Come back, I'm waiting"
+        const val pause = "Pause"
+        const val resume = "Resume"
+        const val paused = "Paused. Resume when ready."
         val readingLines = listOf("Shh, reading time.", "We've got this.", "Page by page")
         const val deepFocusOn = "Deep Focus on"
         fun cancel(freeLeft: Int) = "Cancel ($freeLeft)"
@@ -155,6 +158,11 @@ object Strings {
         const val chooseApps = "Choose apps"
         const val restore = "Restore"
         const val remove = "Remove"
+        const val editTag = "Edit tag"
+        const val name = "Name"
+        const val colour = "Colour"
+        const val save = "Save"
+        const val cancel = "Cancel"
         const val removedTags = "Removed tags"
         const val tagsHint = "Add tags when starting a session."
         const val ambientMusic = "Ambient music while focusing"

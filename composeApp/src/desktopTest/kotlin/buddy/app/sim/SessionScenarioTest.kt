@@ -247,6 +247,45 @@ class SessionScenarioTest {
     }
 
     @Test
+    fun manualPauseFreezesTheClockAndScalesTheReward() {
+        Harness().use { h ->
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.advance(60_000)
+            h.controller.pauseSession()
+            val paused = assertIs<Phase.Running>(h.phase())
+            assertNotNull(paused.session.awaySince)
+
+            h.advance(10 * 60_000L)
+            assertIs<Phase.Running>(h.phase())
+            h.controller.resumeSession()
+            assertEquals(null, (h.phase() as Phase.Running).session.awaySince)
+
+            h.advance(24 * 60_000L)
+            val rewarded = assertIs<Phase.Rewarded>(h.phase())
+            assertEquals(21, rewarded.acorns) // 30 scaled by 25/35
+            assertEquals(25 * 60L, h.state().sessions.single().session.focusedSec)
+            assertEquals(10 * 60L, h.state().sessions.single().session.awaySec)
+        }
+    }
+
+    @Test
+    fun stoppingWhilePausedEndsAtThePause() {
+        Harness().use { h ->
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.advance(6 * 60_000L)
+            h.controller.pauseSession()
+            val pausedAt = (h.phase() as Phase.Running).session.awaySince!!
+            h.advance(5 * 60_000L)
+            h.controller.stopSession()
+            val rec = h.state().sessions.single()
+            assertEquals(false, rec.session.completed)
+            assertEquals(pausedAt, rec.session.endedAt)
+            assertEquals(6 * 60L, rec.session.focusedSec)
+            assertEquals(6, h.state().acorns)
+        }
+    }
+
+    @Test
     fun desktopPlatformDoesNotInterruptWhenLeaving() {
         Harness(leavingAppInterrupts = false).use { h ->
             h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)

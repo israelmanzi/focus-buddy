@@ -14,6 +14,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -42,8 +50,10 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
     val scope = rememberCoroutineScope()
     var pickingApps by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf<String?>(null) }
+    var editingTag by remember { mutableStateOf<buddy.core.TagInfo?>(null) }
 
     if (pickingApps) { AppPicker(controller) { pickingApps = false }; return }
+    editingTag?.let { TagEditor(controller, it) { editingTag = null }; return }
 
     SheetCard(onClose) {
         Title(Strings.Settings.title)
@@ -81,7 +91,7 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
                     Row(Modifier.fillMaxWidth().padding(vertical = Space.xxs), verticalAlignment = Alignment.CenterVertically) {
                         TagDot(Color(t.color))
                         Spacer(Modifier.width(Space.md))
-                        Text(t.name, style = label(Type.body), modifier = Modifier.weight(1f))
+                        Text(t.name, style = label(Type.body), modifier = Modifier.weight(1f).tap { editingTag = t })
                         if (t.id != Rules.DEFAULT_TAG) {
                             Text(
                                 Strings.Settings.remove, style = label(Type.foot, FontWeight.Bold, Ink.berry),
@@ -290,5 +300,42 @@ private fun AppPicker(controller: AppController, onClose: () -> Unit) {
         }
         Spacer(Modifier.height(Space.md))
         ChunkyButton(Strings.Settings.done, color = Ink.leaf, textColor = Ink.onSelected) { onClose() }
+    }
+}
+
+
+@Composable
+private fun TagEditor(controller: AppController, tag: buddy.core.TagInfo, onClose: () -> Unit) {
+    var name by remember(tag.id) { mutableStateOf(tag.name) }
+    var color by remember(tag.id) { mutableStateOf(tag.color) }
+    Scrim(onClose) {
+        Panel(Modifier.widthIn(max = 380.dp).padding(Space.xxl)) {
+            Title(Strings.Settings.editTag, Type.heading)
+            Spacer(Modifier.height(Space.lg))
+            TextInput(name, { name = it.take(24) }, Strings.Settings.name, Modifier.fillMaxWidth())
+            Spacer(Modifier.height(Space.lg))
+            Text(Strings.Settings.colour, style = label(Type.body))
+            Spacer(Modifier.height(Space.sm))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+                tagColors.forEach { c ->
+                    val selected = color == c
+                    Box(
+                        Modifier.size(if (selected) 30.dp else 24.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color(c))
+                            .border(if (selected) 3.dp else 1.5.dp, Ink.outline, RoundedCornerShape(50))
+                            .tap { color = c },
+                    )
+                }
+            }
+            Spacer(Modifier.height(Space.xl))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.lg)) {
+                ChunkyButton(Strings.Settings.cancel, color = Ink.berry, textColor = Ink.onSelected, fontSize = Type.body) { onClose() }
+                ChunkyButton(Strings.Settings.save, color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.body, enabled = name.isNotBlank()) {
+                    controller.upsertTag(tag.id, name.trim(), color, tag.archived)
+                    onClose()
+                }
+            }
+        }
     }
 }

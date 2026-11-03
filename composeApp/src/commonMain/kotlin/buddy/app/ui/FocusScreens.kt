@@ -186,7 +186,17 @@ fun RunningScreen(controller: AppController, phase: Phase.Running) {
             RunningClock(rs, now)
             if (rs.deepFocus) Text(Strings.Session.deepFocusOn, style = label(Type.small, color = Ink.butter))
             Spacer(Modifier.height(Space.xxxl))
-            RunningStop(controller, rs, now)
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.lg), verticalAlignment = Alignment.CenterVertically) {
+                if (!rs.deepFocus) {
+                    ChunkyButton(
+                        if (rs.awaySince != null) Strings.Session.resume else Strings.Session.pause,
+                        color = Ink.butter, fontSize = Type.bodyLarge,
+                    ) {
+                        if (rs.awaySince != null) controller.resumeSession() else controller.pauseSession()
+                    }
+                }
+                RunningStop(controller, rs, now)
+            }
             Spacer(Modifier.height(Space.xxxl))
         }
     }
@@ -194,9 +204,10 @@ fun RunningScreen(controller: AppController, phase: Phase.Running) {
 
 @Composable
 private fun RunningHint(rs: RunningSession, now: State<Long>) {
-    val elapsed = (now.value - rs.startedAt) / 1000
+    val at = rs.awaySince ?: now.value
+    val elapsed = (at - rs.startedAt) / 1000
     Text(
-        if (rs.awaySince != null) Strings.Session.away
+        if (rs.awaySince != null) Strings.Session.paused
         else Strings.Session.readingLines[((elapsed / 20) % 3).toInt()],
         style = label(Type.button, color = Ink.paper), textAlign = TextAlign.Center,
     )
@@ -204,14 +215,16 @@ private fun RunningHint(rs: RunningSession, now: State<Long>) {
 
 @Composable
 private fun RunningClock(rs: RunningSession, now: State<Long>) {
-    val elapsed = (now.value - rs.startedAt) / 1000
+    val at = rs.awaySince ?: now.value
+    val elapsed = (at - rs.startedAt) / 1000
     val shown = if (rs.countUp) elapsed else rs.plannedMin * 60L - elapsed
     Text(formatClock(shown), style = label(Type.clock, FontWeight.Black, Ink.onSelected))
 }
 
 @Composable
 private fun RunningStop(controller: AppController, rs: RunningSession, now: State<Long>) {
-    val elapsed = (now.value - rs.startedAt) / 1000
+    val at = rs.awaySince ?: now.value
+    val elapsed = (at - rs.startedAt) / 1000
     val freeLeft = controller.freeCancelLeft(rs)
     when {
         freeLeft > 0 -> ChunkyButton(Strings.Session.cancel(freeLeft), color = Ink.paperDeep) { controller.stopSession() }

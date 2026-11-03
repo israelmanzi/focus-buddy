@@ -128,6 +128,14 @@ class AppController(
         // The ticker polls every 500 ms; a tap at the planned end must not record an earned
         // countdown as abandoned just because it beat the next tick.
         if (checkSession(rs)) return
+        // Stopping while paused ends the session at the moment it was paused.
+        if (rs.awaySince != null) {
+            if (freeCancelLeft(rs) > 0) { endSession(rs, null); return }
+            val awayAt = rs.awaySince
+            val plannedEnd = SessionLogic.plannedEnd(rs)
+            finish(rs, awayAt, completed = plannedEnd != null && awayAt >= plannedEnd)
+            return
+        }
         when {
             freeCancelLeft(rs) > 0 -> endSession(rs, null)
             rs.countUp -> finish(rs, clock(), completed = true)
@@ -139,19 +147,27 @@ class AppController(
      * Leaving pauses the timer: the time away is not counted and scales the final reward down.
      * Deep Focus sessions are not paused; the blocker handles other apps.
      */
-    fun onAppBackgrounded() {
+    /** Manual pause from the running screen. */
+    fun pauseSession() {
         val rs = (_phase.value as? Phase.Running)?.session ?: return
-        if (!platform.leavingAppInterrupts || rs.deepFocus || rs.awaySince != null) return
+        if (rs.awaySince != null) return
+        beginPause(rs)
+    }
+
+    fun resumeSession() {
+        val rs = (_phase.value as? Phase.Running)?.session ?: return
+        endPause(rs)
+    }
+
+    private fun beginPause(rs: RunningSession) {
         val away = rs.copy(awaySince = clock(), lastHeartbeat = clock())
         saveMeta(meta.copy(running = away))
         _phase.value = Phase.Running(away)
         platform.onSessionPaused()
     }
 
-    fun onAppForegrounded() {
-        val rs = (_phase.value as? Phase.Running)?.session ?: return
-        val awayAt = rs.awaySince
-        if (awayAt == null) { checkSession(rs); return }
+    private fun endPause(rs: RunningSession) {
+        val awayAt = rs.awaySince ?: return
         val now = clock()
         val paused = (now - awayAt).coerceAtLeast(0)
         val back = rs.copy(
@@ -164,6 +180,18 @@ class AppController(
         _phase.value = Phase.Running(back)
         platform.onSessionResumed()
         checkSession(back)
+    }
+
+    fun onAppBackgrounded() {
+        val rs = (_phase.value as? Phase.Running)?.session ?: return
+        if (!platform.leavingAppInterrupts || rs.deepFocus || rs.awaySince != null) return
+        beginPause(rs)
+    }
+
+    fun onAppForegrounded() {
+        val rs = (_phase.value as? Phase.Running)?.session ?: return
+        if (rs.awaySince != null) endPause(rs)
+        else { saveMeta(meta.copy(running = rs.copy(lastHeartbeat = clock()))); checkSession(rs) }
     }
 
     fun dismissResult() {
