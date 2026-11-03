@@ -6,6 +6,13 @@ import java.io.File
 
 enum class Sound { START, COMPLETE, BREAK_END, TAP }
 
+sealed interface InstallResult {
+    data object Started : InstallResult
+    /** The downloaded APK is signed differently from the installed app; one manual reinstall is needed. */
+    data object SignatureMismatch : InstallResult
+    data object Failed : InstallResult
+}
+
 data class AppInfo(val packageName: String, val label: String)
 
 /** What the shared controller needs from the host OS. Android implements all of it; desktop mostly no-ops. */
@@ -46,7 +53,7 @@ interface Platform {
     /** In-app updates: check the project's GitHub releases; installing is Android-only. */
     val appVersion: String get() = APP_VERSION
     suspend fun checkForUpdate(): UpdateInfo? = null
-    fun installUpdate(info: UpdateInfo): Boolean = false
+    fun installUpdate(info: UpdateInfo, onProgress: (Float) -> Unit = {}): InstallResult = InstallResult.Failed
     fun openUrl(url: String) {}
 
     /** Deep Focus support. */

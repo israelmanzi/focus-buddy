@@ -196,8 +196,27 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
                     Text("${Strings.Updates.available}: ${info.version}", style = label(Type.foot, FontWeight.Bold, Ink.leafDark))
                     Spacer(Modifier.height(Space.sm))
                     if (p.name == "android") {
+                        var progress by remember(info.version) { mutableStateOf<Float?>(null) }
                         ChunkyButton(Strings.Updates.install, color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md)) {
-                            status = if (p.installUpdate(info)) Strings.Updates.started else Strings.Updates.failed
+                            progress = 0f
+                            status = Strings.Updates.downloading(0)
+                            when (val r = p.installUpdate(info) { f ->
+                                if (f >= 0f) {
+                                    progress = f
+                                    status = Strings.Updates.downloading((f * 100).toInt())
+                                } else progress = null
+                            }) {
+                                buddy.app.InstallResult.Started -> status = Strings.Updates.started
+                                buddy.app.InstallResult.SignatureMismatch -> status = Strings.Updates.signatureMismatch
+                                buddy.app.InstallResult.Failed -> { status = Strings.Updates.failed; progress = null }
+                            }
+                        }
+                        progress?.let { f ->
+                            Spacer(Modifier.height(Space.sm))
+                            androidx.compose.material3.LinearProgressIndicator(
+                                progress = { f.coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         }
                     } else {
                         ChunkyButton(Strings.Updates.openPage, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md)) {

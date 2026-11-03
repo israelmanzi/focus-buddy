@@ -64,6 +64,14 @@ Add `BUDDY_KEYSTORE_BASE64`, `BUDDY_KEYSTORE_PASSWORD`, `BUDDY_KEY_ALIAS` and
 `BUDDY_KEY_PASSWORD` as repository secrets to sign the APK with your own key. Without them the
 APK is debug-signed: installable, but it cannot be installed over a differently signed build.
 
+## Signing key
+
+CI signs every release with the project key stored in the repository secrets (`BUDDY_KEYSTORE_BASE64`,
+`BUDDY_KEYSTORE_PASSWORD`, `BUDDY_KEY_ALIAS`, `BUDDY_KEY_PASSWORD`). Keep a backup of
+`~/.config/focus-buddy/release.jks`: an APK signed with a different key cannot replace an installed
+one. Local builds use the debug key unless you export the same variables before
+`./gradlew :composeApp:assembleRelease`.
+
 ## Who owns the data
 
 Every install starts empty and private: the event log lives in the app's own storage, nothing is

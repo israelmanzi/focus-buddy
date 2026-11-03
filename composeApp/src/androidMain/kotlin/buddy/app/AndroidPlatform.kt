@@ -94,28 +94,56 @@ class AndroidPlatform(private val app: Application) : Platform {
         )
     }
 
-    override fun installUpdate(info: UpdateInfo): Boolean {
-        val url = info.downloadUrl ?: return false
+    override fun installUpdate(info: UpdateInfo, onProgress: (Float) -> Unit): InstallResult {
+        val url = info.downloadUrl ?: return InstallResult.Failed
         val target = File(app.cacheDir, "focus-buddy-update.apk")
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
         return runCatching {
             Thread {
-                runCatching {
+                val result = runCatching {
                     val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                         connectTimeout = 10_000; readTimeout = 60_000
                         instanceFollowRedirects = true
                     }
-                    conn.inputStream.use { input -> target.outputStream().use { input.copyTo(it) } }
+                    val total = conn.contentLengthLong
+                    conn.inputStream.use { input ->
+                        target.outputStream().use { out ->
+                            val buf = ByteArray(64 * 1024)
+                            var readTotal = 0L
+                            while (true) {
+                                val n = input.read(buf)
+                                if (n < 0) break
+                                out.write(buf, 0, n)
+                                readTotal += n
+                                if (total > 0) main.post { onProgress((readTotal.toFloat() / total).coerceIn(0f, 1f)) }
+                            }
+                        }
+                    }
                     conn.disconnect()
-                    val uri = androidx.core.content.FileProvider.getUriForFile(app, "${app.packageName}.updates", target)
-                    val intent = Intent(Intent.ACTION_VIEW)
-                        .setDataAndType(uri, "application/vnd.android.package-archive")
-                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                    app.startActivity(intent)
-                }
+                    if (!sameSigner(target)) return@runCatching InstallResult.SignatureMismatch
+                    main.post {
+                        val uri = androidx.core.content.FileProvider.getUriForFile(app, "${app.packageName}.updates", target)
+                        val intent = Intent(Intent.ACTION_VIEW)
+                            .setDataAndType(uri, "application/vnd.android.package-archive")
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                        app.startActivity(intent)
+                    }
+                    InstallResult.Started
+                }.getOrDefault(InstallResult.Failed)
+                main.post { onProgress(if (result == InstallResult.Started) 1f else -1f) }
             }.start()
-            true
-        }.getOrDefault(false)
+            InstallResult.Started
+        }.getOrDefault(InstallResult.Failed)
     }
+
+    /** The system refuses an APK signed by a different key; detect it before opening the installer. */
+    private fun sameSigner(apk: File): Boolean = runCatching {
+        val pm = app.packageManager
+        val flags = android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES
+        val mine = pm.getPackageInfo(app.packageName, flags).signingInfo?.apkContentsSigners?.firstOrNull()?.toByteArray()
+        val theirs = pm.getPackageArchiveInfo(apk.absolutePath, flags)?.signingInfo?.apkContentsSigners?.firstOrNull()?.toByteArray()
+        mine != null && theirs != null && mine.contentEquals(theirs)
+    }.getOrDefault(false)
 
     override fun openUrl(url: String) {
         runCatching {

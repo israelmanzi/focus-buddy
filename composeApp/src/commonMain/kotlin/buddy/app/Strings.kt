@@ -208,7 +208,11 @@ object Strings {
         const val install = "Download and install"
         const val openPage = "Open the release page"
         const val failed = "Could not check for updates"
-        const val started = "Starting the installer"
+        const val started = "Installer opened"
+        const val signatureMismatch =
+            "This release is signed with a different key, so Android cannot replace the installed app. " +
+                "Uninstall once, install this APK manually, and updates will work from then on."
+        fun downloading(percent: Int) = "Downloading $percent%"
     }
 
     object About {
