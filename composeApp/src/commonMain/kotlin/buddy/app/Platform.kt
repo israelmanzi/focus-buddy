@@ -53,7 +53,7 @@ interface Platform {
     /** In-app updates: check the project's GitHub releases; installing is Android-only. */
     val appVersion: String get() = APP_VERSION
     suspend fun checkForUpdate(): UpdateInfo? = null
-    fun installUpdate(info: UpdateInfo, onProgress: (Float) -> Unit = {}): InstallResult = InstallResult.Failed
+    suspend fun installUpdate(info: UpdateInfo, onProgress: (Float) -> Unit = {}): InstallResult = InstallResult.Failed
     fun openUrl(url: String) {}
 
     /** Deep Focus support. */

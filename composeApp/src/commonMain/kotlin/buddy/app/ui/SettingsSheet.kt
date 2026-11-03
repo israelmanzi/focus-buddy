@@ -200,15 +200,18 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
                         ChunkyButton(Strings.Updates.install, color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md)) {
                             progress = 0f
                             status = Strings.Updates.downloading(0)
-                            when (val r = p.installUpdate(info) { f ->
-                                if (f >= 0f) {
-                                    progress = f
-                                    status = Strings.Updates.downloading((f * 100).toInt())
-                                } else progress = null
-                            }) {
-                                buddy.app.InstallResult.Started -> status = Strings.Updates.started
-                                buddy.app.InstallResult.SignatureMismatch -> status = Strings.Updates.signatureMismatch
-                                buddy.app.InstallResult.Failed -> { status = Strings.Updates.failed; progress = null }
+                            scope.launch {
+                                val r = p.installUpdate(info) { f ->
+                                    if (f >= 0f) {
+                                        progress = f
+                                        status = Strings.Updates.downloading((f * 100).toInt())
+                                    } else progress = null
+                                }
+                                when (r) {
+                                    buddy.app.InstallResult.Started -> status = Strings.Updates.started
+                                    buddy.app.InstallResult.SignatureMismatch -> status = Strings.Updates.signatureMismatch
+                                    buddy.app.InstallResult.Failed -> { status = Strings.Updates.failed; progress = null }
+                                }
                             }
                         }
                         progress?.let { f ->

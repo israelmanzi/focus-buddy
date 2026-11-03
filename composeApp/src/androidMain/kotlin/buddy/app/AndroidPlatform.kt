@@ -94,45 +94,45 @@ class AndroidPlatform(private val app: Application) : Platform {
         )
     }
 
-    override fun installUpdate(info: UpdateInfo, onProgress: (Float) -> Unit): InstallResult {
+    override suspend fun installUpdate(info: UpdateInfo, onProgress: (Float) -> Unit): InstallResult {
         val url = info.downloadUrl ?: return InstallResult.Failed
         val target = File(app.cacheDir, "focus-buddy-update.apk")
-        val main = android.os.Handler(android.os.Looper.getMainLooper())
         return runCatching {
-            Thread {
-                val result = runCatching {
-                    val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                        connectTimeout = 10_000; readTimeout = 60_000
-                        instanceFollowRedirects = true
-                    }
-                    val total = conn.contentLengthLong
-                    conn.inputStream.use { input ->
-                        target.outputStream().use { out ->
-                            val buf = ByteArray(64 * 1024)
-                            var readTotal = 0L
-                            while (true) {
-                                val n = input.read(buf)
-                                if (n < 0) break
-                                out.write(buf, 0, n)
-                                readTotal += n
-                                if (total > 0) main.post { onProgress((readTotal.toFloat() / total).coerceIn(0f, 1f)) }
+            withContext(Dispatchers.IO) {
+                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 10_000; readTimeout = 60_000
+                    instanceFollowRedirects = true
+                }
+                val total = conn.contentLengthLong
+                conn.inputStream.use { input ->
+                    target.outputStream().use { out ->
+                        val buf = ByteArray(64 * 1024)
+                        var readTotal = 0L
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n < 0) break
+                            out.write(buf, 0, n)
+                            readTotal += n
+                            if (total > 0) withContext(Dispatchers.Main) {
+                                onProgress((readTotal.toFloat() / total).coerceIn(0f, 1f))
                             }
                         }
                     }
-                    conn.disconnect()
-                    if (!sameSigner(target)) return@runCatching InstallResult.SignatureMismatch
-                    main.post {
-                        val uri = androidx.core.content.FileProvider.getUriForFile(app, "${app.packageName}.updates", target)
-                        val intent = Intent(Intent.ACTION_VIEW)
-                            .setDataAndType(uri, "application/vnd.android.package-archive")
-                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                        app.startActivity(intent)
-                    }
-                    InstallResult.Started
-                }.getOrDefault(InstallResult.Failed)
-                main.post { onProgress(if (result == InstallResult.Started) 1f else -1f) }
-            }.start()
+                }
+                conn.disconnect()
+            }
+            if (!sameSigner(target)) return InstallResult.SignatureMismatch
+            withContext(Dispatchers.Main) {
+                val uri = androidx.core.content.FileProvider.getUriForFile(app, "${app.packageName}.updates", target)
+                val intent = Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(uri, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                app.startActivity(intent)
+            }
             InstallResult.Started
+        }.onFailure {
+            android.util.Log.w("FocusBuddy", "Update install failed", it)
+            withContext(Dispatchers.Main) { onProgress(-1f) }
         }.getOrDefault(InstallResult.Failed)
     }
 
