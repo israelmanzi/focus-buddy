@@ -15,3 +15,6 @@ hs_err_pid*.log
 replay_pid*.log
 core.[0-9]*
 *.hprof
+
+# local planning notes
+FEATURELIST.md
