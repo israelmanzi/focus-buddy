@@ -68,8 +68,8 @@ android {
         applicationId = "net.focusbuddy.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.2.1"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -117,7 +117,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Rpm, TargetFormat.Deb, TargetFormat.AppImage)
             packageName = "focus-buddy"
-            packageVersion = "0.1.0"
+            packageVersion = "0.2.1"
             linux { iconFile.set(project.file("icon.png")) }
         }
     }
