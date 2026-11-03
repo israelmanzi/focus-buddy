@@ -117,10 +117,10 @@ class AppControllerTest {
     }
 
     @Test
-    fun abandonsSessionWhoseGraceRanOutWhileDead() {
+    fun aSessionPausedWhenTheProcessDiedKeepsTheFocusedMinutes() {
         val started = 1_000_000L
-        // 200 s of a 25 minute plan is over the 10 % discard threshold.
-        val away = started + 200_000L
+        // Six focused minutes of a 25 minute plan: above the earning minimum and the 10 % floor.
+        val away = started + 6 * 60_000L
         Store(dir).saveMeta(
             DeviceMeta(
                 "dev",
@@ -132,31 +132,28 @@ class AppControllerTest {
         val rec = c.state.value.sessions.single()
         assertEquals(false, rec.session.completed)
         assertEquals(away, rec.session.endedAt)
-        assertEquals(200L, rec.session.focusedSec)
-        assertEquals(0, c.state.value.acorns)
+        assertEquals(6 * 60L, rec.session.focusedSec)
+        assertEquals(6, c.state.value.acorns) // partial credit, no completion bonus
         assertTrue(c.phase.value is Phase.Interrupted)
     }
 
     @Test
-    fun completesSessionThatEndedInsideItsGraceWindowWhileDead() {
+    fun aSessionPausedBeforeTheEndEndsAtThePause() {
         val started = 1_000_000L
-        val away = started + 25 * 60_000L - 10_000L // grace ends ten seconds after the planned end
+        val away = started + 25 * 60_000L - 10_000L
         Store(dir).saveMeta(
-            // Alive one second past the planned end, so the completion is genuine.
             DeviceMeta(
                 "dev",
-                running = RunningSession(
-                    started, 25, false, Rules.DEFAULT_TAG, false,
-                    awaySince = away, lastHeartbeat = started + 25 * 60_000L + 1_000L,
-                ),
+                running = RunningSession(started, 25, false, Rules.DEFAULT_TAG, false, awaySince = away),
             ),
         )
         now = started + 60 * 60_000L
         val c = controller()
         val rec = c.state.value.sessions.single()
-        assertTrue(rec.session.completed)
-        assertEquals(started + 25 * 60_000L, rec.session.endedAt)
-        assertEquals(30, c.state.value.acorns)
+        assertEquals(false, rec.session.completed)
+        assertEquals(away, rec.session.endedAt)
+        assertEquals(24 * 60L + 50, rec.session.focusedSec)
+        assertEquals(24, c.state.value.acorns)
     }
 
     @Test

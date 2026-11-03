@@ -20,9 +20,9 @@ interface Platform {
     fun onSessionStarted(startedAtMs: Long, endsAtMs: Long?, deepFocus: Boolean, rules: BlockRules) {}
     fun onSessionEnded() {}
 
-    /** The user left the app mid-session; nudge them back before `deadlineMs`. */
-    fun onLeftDuringSession(deadlineMs: Long) {}
-    fun onReturned() {}
+    /** Kept for hosts that want to react to foreground changes; sessions keep running either way. */
+    fun onSessionPaused() {}
+    fun onSessionResumed() {}
 
     fun onBreakStarted(endsAtMs: Long) {}
     fun onBreakEnded() {}
@@ -42,6 +42,12 @@ interface Platform {
     val supportsExactAlarms: Boolean get() = false
     fun exactAlarmsGranted(): Boolean = true
     fun requestExactAlarms() {}
+
+    /** In-app updates: check the project's GitHub releases; installing is Android-only. */
+    val appVersion: String get() = APP_VERSION
+    suspend fun checkForUpdate(): UpdateInfo? = null
+    fun installUpdate(info: UpdateInfo): Boolean = false
+    fun openUrl(url: String) {}
 
     /** Deep Focus support. */
     val supportsDeepFocus: Boolean get() = false

@@ -71,6 +71,10 @@ class FocusService : Service() {
     override fun onDestroy() {
         scope.cancel()
         hideOverlay()
+        // Removing the foreground notification explicitly: a stopped service can leave it behind
+        // on some OEM builds, and a "focusing" notice after the session ended is confusing.
+        Notify.cancel(this, Notify.ID_SESSION)
+        stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
 

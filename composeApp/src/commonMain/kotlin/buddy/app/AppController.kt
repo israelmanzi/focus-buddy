@@ -33,7 +33,7 @@ private const val HEARTBEAT_MS = 30_000L
 sealed interface Phase {
     data object Idle : Phase
     data class Running(val session: RunningSession) : Phase
-    data class Interrupted(val focusedMin: Int) : Phase
+    data class Interrupted(val focusedMin: Int, val acorns: Int = 0) : Phase
     data class Rewarded(val acorns: Int, val minutes: Int) : Phase
     data object BreakOffer : Phase
     data class OnBreak(val endsAt: Long) : Phase
@@ -135,23 +135,19 @@ class AppController(
         }
     }
 
+    /**
+     * Leaving the app is allowed: research, notes and other work keep the session counting.
+     * Only Deep Focus restricts apps, through the foreground service.
+     */
     fun onAppBackgrounded() {
         val rs = (_phase.value as? Phase.Running)?.session ?: return
-        if (!platform.leavingAppInterrupts || rs.deepFocus || rs.awaySince != null) return
-        val away = rs.copy(awaySince = clock())
-        saveMeta(meta.copy(running = away))
-        _phase.value = Phase.Running(away)
-        platform.onLeftDuringSession(away.awaySince!! + _settings.value.graceSec * 1000L)
+        saveMeta(meta.copy(running = rs.copy(lastHeartbeat = clock())))
     }
 
     fun onAppForegrounded() {
         val rs = (_phase.value as? Phase.Running)?.session ?: return
-        if (rs.awaySince == null) return
-        if (checkSession(rs)) return
-        val back = rs.copy(awaySince = null)
-        saveMeta(meta.copy(running = back))
-        _phase.value = Phase.Running(back)
-        platform.onReturned()
+        saveMeta(meta.copy(running = rs.copy(lastHeartbeat = clock())))
+        checkSession(rs)
     }
 
     fun dismissResult() {
@@ -162,6 +158,13 @@ class AppController(
     }
 
     private fun resume(rs: RunningSession) {
+        // Left the app and the process died before coming back: the session ended when it was paused.
+        rs.awaySince?.let { awayAt ->
+            val plannedEnd = SessionLogic.plannedEnd(rs)
+            finish(rs, if (plannedEnd != null) minOf(awayAt, plannedEnd) else awayAt,
+                completed = plannedEnd != null && awayAt >= plannedEnd)
+            return
+        }
         // If the process was dead (crash, force stop, reboot), do not let a count-up session keep
         // running in wall-clock time and later "complete" at the six-hour cap.
         val lastAlive = rs.lastHeartbeat ?: rs.startedAt
@@ -200,7 +203,7 @@ class AppController(
 
     /** Applies the time-based rules. Returns true if the session ended. */
     private fun checkSession(rs: RunningSession): Boolean {
-        return when (val t = SessionLogic.tick(rs, clock(), _settings.value.graceSec)) {
+        return when (val t = SessionLogic.tick(rs, clock())) {
             is SessionTick.Complete -> { finish(rs, t.endedAt, completed = true); true }
             is SessionTick.Abandon -> { finish(rs, t.endedAt, completed = false); true }
             SessionTick.Continue -> false
@@ -220,14 +223,17 @@ class AppController(
         val session = Payload.Session(rs.startedAt, endedAt, rs.plannedMin, sec, rs.tag, completed, rs.deepFocus)
         val reward = Rules.reward(session)
         endSession(rs, session)
-        _phase.value = when {
-            reward > 0 -> Phase.Rewarded(reward, (sec / 60).toInt()).also {
+        _phase.value = if (completed && reward > 0) {
+            Phase.Rewarded(reward, (sec / 60).toInt()).also {
                 platform.showNotification(
                     Strings.Notifications.completeTitle,
                     Strings.Notifications.completeBody(reward, (sec / 60).toInt()),
                 )
             }
-            else -> Phase.Interrupted((sec / 60).toInt()).also {
+        } else {
+            // Abandoned, or too short to earn: never show the celebration card for it. Any minutes
+            // already focused are still paid and shown on the sad card.
+            Phase.Interrupted((sec / 60).toInt(), reward).also {
                 platform.showNotification(Strings.Notifications.endedTitle, Strings.Notifications.endedBody)
             }
         }

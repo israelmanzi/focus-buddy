@@ -74,12 +74,12 @@ class EventOrderingTest {
     }
 
     @Test
-    fun abandonedSessionsHaveZeroRewardRegardlessOfLength() {
+    fun abandonedSessionsKeepTheirFocusedMinutes() {
         val e = event(1, Payload.Session(0, 300 * 60_000L, 300, 300 * 60L, "focus", completed = false))
         val state = GameState.fold(listOf(e))
-        assertEquals(0, state.acorns)
+        assertEquals(300, state.acorns)
         assertEquals(1, state.sessions.size)
-        assertEquals(0, state.sessions.single().reward)
+        assertEquals(300, state.sessions.single().reward)
     }
 
     @Test

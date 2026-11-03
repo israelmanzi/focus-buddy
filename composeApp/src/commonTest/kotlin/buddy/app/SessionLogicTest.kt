@@ -13,35 +13,26 @@ class SessionLogicTest {
     @Test
     fun countdownCompletesExactlyAtPlannedEnd() {
         val s = rs(1_000, 25)
-        assertEquals(SessionTick.Continue, SessionLogic.tick(s, 1_000 + 1_499_999, 20))
-        assertEquals(SessionTick.Complete(1_000 + 1_500_000), SessionLogic.tick(s, 1_000 + 1_500_000, 20))
+        assertEquals(SessionTick.Continue, SessionLogic.tick(s, 1_000 + 1_499_999))
+        assertEquals(SessionTick.Complete(1_000 + 1_500_000), SessionLogic.tick(s, 1_000 + 1_500_000))
     }
 
     @Test
-    fun awayPastGraceAbandonsAtTheMomentOfLeaving() {
+    fun awayPausesTheTimerInsteadOfFailing() {
         val s = rs(0, 25, awaySince = 100_000)
-        assertEquals(SessionTick.Continue, SessionLogic.tick(s, 119_999, 20))
-        assertEquals(SessionTick.Abandon(100_000), SessionLogic.tick(s, 120_000, 20))
-        // Once the grace deadline has passed, still away: abandoned even if the plan had more time.
-        assertEquals(SessionTick.Abandon(100_000), SessionLogic.tick(s, 1_400_000, 20))
-    }
-
-    @Test
-    fun plannedEndInsideTheGraceWindowStillCompletes() {
-        val s = rs(0, 25, awaySince = 1_490_000) // grace until 1_510_000, plan ends 1_500_000
-        assertEquals(SessionTick.Complete(1_500_000), SessionLogic.tick(s, 1_500_000, 20))
-        // The completion branch is checked first, so a dead process past the deadline still
-        // gets the completed session it earned inside the grace window.
-        assertEquals(SessionTick.Complete(1_500_000), SessionLogic.tick(s, 1_700_000, 20))
+        // Time passes while the user is in another app: nothing happens, the session waits.
+        assertEquals(SessionTick.Continue, SessionLogic.tick(s, 120_000))
+        assertEquals(SessionTick.Continue, SessionLogic.tick(s, 1_400_000))
+        assertEquals(SessionTick.Continue, SessionLogic.tick(s, 10L * 86_400_000))
     }
 
     @Test
     fun countUpStopsAtTheCapEvenAfterAHugeClockJump() {
         val s = rs(0, 0, countUp = true)
-        assertEquals(SessionTick.Continue, SessionLogic.tick(s, Rules.MAX_MINUTES * 60_000L - 1, 20))
+        assertEquals(SessionTick.Continue, SessionLogic.tick(s, Rules.MAX_MINUTES * 60_000L - 1))
         assertEquals(
             SessionTick.Complete(Rules.MAX_MINUTES * 60_000L),
-            SessionLogic.tick(s, 10L * 365 * 86_400_000, 20),
+            SessionLogic.tick(s, 10L * 365 * 86_400_000),
         )
     }
 

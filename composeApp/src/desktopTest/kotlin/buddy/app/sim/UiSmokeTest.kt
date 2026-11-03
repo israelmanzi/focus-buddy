@@ -85,11 +85,11 @@ class UiSmokeTest {
             h.controller.startSession(25, countUp = false, tag = "focus", deepFocus = false)
             h.advance(60_000)
         }
-        shot("running-grace-active") { h ->
+        shot("running-while-away") { h ->
             h.controller.startSession(25, countUp = false, tag = "focus", deepFocus = false)
             h.advance(60_000)
             h.controller.onAppBackgrounded()
-            assertTrue((h.phase() as Phase.Running).session.awaySince != null)
+            assertTrue(h.phase() is Phase.Running)
         }
         shot("running-count-up") { h ->
             h.controller.startSession(25, countUp = true, tag = "focus", deepFocus = false)

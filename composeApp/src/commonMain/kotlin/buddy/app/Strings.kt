@@ -45,7 +45,7 @@ object Strings {
         const val tagHint = "Tag name"
         const val add = "Add"
         const val deepFocus = "Deep Focus"
-        fun leaveWarning(graceSec: Int) = "Leaving the app ends the session after ${graceSec}s"
+        const val leavePauses = "Leaving the app is fine; the timer keeps running"
         const val needsPermissions = "Needs permissions. Tap Set up"
         const val noApps = "No apps chosen yet (Settings)"
         fun onlyApps(count: Int) = "Only ${appCount(count)} allowed"
@@ -72,6 +72,7 @@ object Strings {
         fun interruptedFocused(minutes: String) =
             "We focused for $minutes, but the session ended early. No acorns this time. Shall we try again?"
         const val interruptedEarly = "The session ended before it really started. Let's try again?"
+        fun interruptedKept(acorns: Int) = "You keep $acorns acorns for the time you focused."
         const val okay = "Okay"
         const val breakTitle = "Tea break?"
         fun breakMinutes(minutes: Int) = "$minutes min"
@@ -139,7 +140,7 @@ object Strings {
         const val backupSection = "Backup"
         const val aboutSection = "About"
 
-        const val gracePeriod = "Grace period when leaving the app"
+        const val pauseNote = "Switch to Chrome or notes whenever you need. The timer keeps running; Deep Focus is the only thing that blocks apps."
         fun seconds(seconds: Int) = "${seconds}s"
         const val keepScreenOn = "Keep awake while focusing"
         const val onTimeAlerts = "On-time break alerts"
@@ -195,6 +196,19 @@ object Strings {
         fun folder(dir: String) = "Folder: $dir"
     }
 
+    object Updates {
+        const val section = "Updates"
+        fun version(v: String) = "Version $v"
+        const val check = "Check for updates"
+        const val checking = "Checking"
+        const val upToDate = "You are on the latest version"
+        const val available = "A new version is available"
+        const val install = "Download and install"
+        const val openPage = "Open the release page"
+        const val failed = "Could not check for updates"
+        const val started = "Starting the installer"
+    }
+
     object About {
         const val appName = "Focus Buddy"
         const val text =
@@ -205,15 +219,16 @@ object Strings {
     object Notifications {
         // Channel names appear in the system notification settings.
         const val sessionChannel = "Focus session"
-        const val nudgeChannel = "Come-back reminders"
+        const val nudgeChannel = "Session paused"
         const val breakChannel = "Break reminders"
+        const val generalChannel = "Session updates"
 
         const val sessionTitle = "Pip is focusing"
         const val sessionBodyTimed = "Stay with Pip until the timer ends"
         const val sessionBodyOpen = "Focusing with Pip"
 
-        const val nudgeTitle = "Come back to Pip"
-        const val nudgeBody = "Return before the timer ends"
+        const val nudgeTitle = "Focus paused"
+        const val nudgeBody = "Return to continue"
 
         const val breakTitle = "Break over"
         const val breakBody = "Ready to focus again?"

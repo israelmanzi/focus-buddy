@@ -109,14 +109,14 @@ class SessionScenarioTest {
     @Test
     fun givingUpAfterTenPercentRecordsAnAbandonedSession() {
         Harness().use { h ->
-            // 10 % of 25 minutes is 150 s.
+            // 10 % of 25 minutes is 150 s; six minutes is well past it and over the 5 minute minimum.
             h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
-            h.advance(200_000)
+            h.advance(6 * 60_000L)
             h.controller.stopSession()
 
             val interrupted = assertIs<Phase.Interrupted>(h.phase())
-            assertEquals(3, interrupted.focusedMin)
-            assertEquals(0, h.state().acorns)
+            assertEquals(6, interrupted.focusedMin)
+            assertEquals(6, h.state().acorns)  // focused minutes, no completion bonus
             assertEquals(1, h.state().sessions.size)
             assertFalse(h.state().sessions.single().session.completed)
             assertEquals(1, stats(h).abandoned)
@@ -173,55 +173,52 @@ class SessionScenarioTest {
     }
 
     @Test
-    fun leavingPastGracePeriodAbandonsSession() {
+    fun leavingKeepsTheTimerRunning() {
         Harness().use { h ->
             h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
             h.advance(60_000)
             h.controller.onAppBackgrounded()
+            // Researching in Chrome or taking notes does not touch the session.
             val away = assertIs<Phase.Running>(h.phase())
-            assertNotNull(away.session.awaySince)
-            val nudge = h.platform.callsNamed("onLeftDuringSession").single()
-            assertEquals(h.clock.now + 20_000, nudge.arg)
+            assertEquals(null, away.session.awaySince)
 
-            h.advance(20_000)
-            // 60 s is far below 10 % of the plan, so the abandon is discarded.
-            assertIs<Phase.Idle>(h.phase())
-            assertEquals(0, h.state().sessions.size)
+            h.advance(10 * 60_000L)
+            assertIs<Phase.Running>(h.phase())
+            h.controller.onAppForegrounded()
+            h.advance(14 * 60_000L)
+            val rewarded = assertIs<Phase.Rewarded>(h.phase())
+            assertEquals(30, rewarded.acorns)
+            assertEquals(25 * 60L, h.state().sessions.single().session.focusedSec)
         }
     }
 
     @Test
-    fun returningWithinGracePeriodKeepsTheSessionAlive() {
+    fun switchingAppsBrieflyKeepsCounting() {
         Harness().use { h ->
             h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
             h.advance(60_000)
             h.controller.onAppBackgrounded()
             h.advance(10_000)
             h.controller.onAppForegrounded()
-
-            val running = assertIs<Phase.Running>(h.phase())
-            assertEquals(null, running.session.awaySince)
-            assertTrue(h.state().sessions.isEmpty())
-            assertEquals(1, h.platform.callsNamed("onReturned").size)
+            assertIs<Phase.Running>(h.phase())
 
             h.advance(24 * 60_000L)
             assertIs<Phase.Rewarded>(h.phase())
-            assertEquals(1, h.state().sessions.size)
-            assertTrue(h.state().sessions.single().session.completed)
+            assertEquals(25 * 60L, h.state().sessions.single().session.focusedSec)
         }
     }
 
     @Test
-    fun returningAfterGraceDoesNotRecordASecondSession() {
+    fun theSessionCompletesWhileTheUserIsInAnotherApp() {
         Harness().use { h ->
             h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
             h.advance(60_000)
             h.controller.onAppBackgrounded()
-            h.advance(21_000) // ticker already abandoned at 20 s; under 10 % so it is discarded
-            assertIs<Phase.Idle>(h.phase())
-
-            h.controller.onAppForegrounded()
-            assertTrue(h.state().sessions.isEmpty())
+            h.advance(25 * 60_000L)
+            // The planned end arrives while Chrome is open; the session counts it.
+            val rewarded = assertIs<Phase.Rewarded>(h.phase())
+            assertEquals(30, rewarded.acorns)
+            assertEquals(25 * 60L, h.state().sessions.single().session.focusedSec)
         }
     }
 
@@ -234,7 +231,7 @@ class SessionScenarioTest {
 
             val running = assertIs<Phase.Running>(h.phase())
             assertEquals(null, running.session.awaySince)
-            assertTrue(h.platform.callsNamed("onLeftDuringSession").isEmpty())
+            assertTrue(h.platform.callsNamed("onSessionPaused").isEmpty())
             assertEquals(0, h.lineCount())
         }
     }
@@ -246,7 +243,7 @@ class SessionScenarioTest {
             h.advance(60_000)
             h.controller.onAppBackgrounded()
             assertIs<Phase.Running>(h.phase())
-            assertTrue(h.platform.callsNamed("onLeftDuringSession").isEmpty())
+            assertTrue(h.platform.callsNamed("onSessionPaused").isEmpty())
         }
     }
 
@@ -292,16 +289,14 @@ class SessionScenarioTest {
     }
 
     @Test
-    fun leavingInTheFinalGraceWindowStillCompletes() {
+    fun leavingJustBeforeTheEndStillCompletes() {
         Harness().use { h ->
             h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
             h.advance(25 * 60_000L - 5_000)
             h.controller.onAppBackgrounded()
-            h.advance(5_000) // planned end reached before grace end
-
+            h.advance(5_000)
             val rewarded = assertIs<Phase.Rewarded>(h.phase())
             assertEquals(30, rewarded.acorns)
-            assertTrue(h.state().sessions.single().session.completed)
             assertEquals(25 * 60L, h.state().sessions.single().session.focusedSec)
         }
     }

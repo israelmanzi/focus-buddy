@@ -139,7 +139,7 @@ fun FocusSetup(controller: AppController, onClose: () -> Unit) {
                         Text(Strings.Focus.deepFocus, style = label(Type.lead))
                         Text(
                             when {
-                                !deep -> Strings.Focus.leaveWarning(settings.graceSec)
+                                !deep -> Strings.Focus.leavePauses
                                 !p.deepFocusReady() -> Strings.Focus.needsPermissions
                                 settings.packages.isEmpty() -> Strings.Focus.noApps
                                 settings.allowMode -> Strings.Focus.onlyApps(settings.packages.size)
@@ -265,6 +265,13 @@ fun InterruptedCard(controller: AppController, phase: Phase.Interrupted) {
                 else Strings.Session.interruptedEarly,
                 style = label(Type.lead, FontWeight.Medium, Ink.muted), textAlign = TextAlign.Center,
             )
+            if (phase.acorns > 0) {
+                Spacer(Modifier.height(Space.md))
+                Text(
+                    Strings.Session.interruptedKept(phase.acorns),
+                    style = label(Type.body, FontWeight.Bold, Ink.leafDark), textAlign = TextAlign.Center,
+                )
+            }
             Spacer(Modifier.height(Space.xxl))
             ChunkyButton(Strings.Session.okay, color = Ink.butter) { controller.dismissResult() }
         }

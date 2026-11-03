@@ -23,19 +23,23 @@ reference and is git-ignored.
 - Duration 5–360 min (slider + −/+ buttons, 5-min steps), count-down or count-up (stopwatch).
 - Tags: unlimited, user-defined, coloured; default tag "Focus".
 - First 10 s: "Cancel (n)" with no penalty. After that: "Give up" ends the session as abandoned.
-- Leaving the app (Android): grace period (default 20 s, configurable); a notification nudges you
-  back. Past the grace period the session is abandoned and Pip is sad.
+- Leaving the app is allowed: using Chrome, notes or another productive app keeps the session
+  counting. Only Deep Focus (opt-in) restricts apps, and that is enforced by the foreground service.
 - A running session writes a heartbeat every 30 s. If the process dies (crash, force stop, reboot),
   the next launch ends the session at its last heartbeat instead of letting wall-clock time run:
   a count-up session can no longer "complete" at the six-hour cap while the app was dead.
-- Abandons under 10 % of the plan (or under five minutes for count-up) are discarded, not recorded.
+- Abandoning keeps the minutes already focused (1 acorn each, no completion bonus) once the
+  session is past 10 % of the plan and at least five minutes; shorter abandons leave no trace.
 - Desktop: leaving the window does not fail a session (you work in other apps there).
 - The room sky follows local time and season: sunrise/sunset are modelled from the day of the year
   (northern-hemisphere approximation), so evenings turn dark when the sun actually sets.
 - Deep Focus (Android): during a session, opening a blocked app shows a full-screen overlay
   that sends you back. Block list *or* allow list mode.
 - Breaks: after completion, offer a 5/10/15-min break or skip.
-- Screen-always-on option while focusing.
+- Keep-awake option while focusing.
+- In-app updates: checks the project's GitHub releases on launch and shows an update chip; on
+  Android it downloads and hands the APK to the system installer; on desktop it opens the release
+  page (the RPM/DEB are installed by the system package manager).
 
 ## Rewards and economy (single currency: acorns)
 - 1 acorn per focused minute, +20 % bonus for completing the planned duration.

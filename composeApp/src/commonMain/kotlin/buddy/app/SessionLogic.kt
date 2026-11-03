@@ -19,25 +19,19 @@ object SessionLogic {
     fun plannedEnd(rs: RunningSession): Long? =
         if (rs.countUp) null else rs.startedAt + rs.plannedMin * 60_000L
 
-    fun graceEnd(rs: RunningSession, graceSec: Int): Long? =
-        rs.awaySince?.plus(graceSec * 1000L)
-
-    /** Applies completion/abandonment rules at [nowMs]. */
-    fun tick(rs: RunningSession, nowMs: Long, graceSec: Int): SessionTick {
-        val graceEnd = graceEnd(rs, graceSec)
+    /**
+     * Applies completion rules at [nowMs]. While the user is away the timer is paused, so a
+     * session can never be lost just by opening another app; [AppController] shifts the start
+     * time forward when they come back.
+     */
+    fun tick(rs: RunningSession, nowMs: Long): SessionTick {
+        if (rs.awaySince != null) return SessionTick.Continue
         val plannedEnd = plannedEnd(rs)
         return when {
-            // A planned session that ends while the user is inside the grace window still counts.
-            plannedEnd != null && nowMs >= plannedEnd && (graceEnd == null || plannedEnd <= graceEnd) ->
-                SessionTick.Complete(plannedEnd)
-
-            // Away past the grace deadline; the session is abandoned at the moment they left.
-            graceEnd != null && nowMs >= graceEnd -> SessionTick.Abandon(rs.awaySince!!)
-
+            plannedEnd != null && nowMs >= plannedEnd -> SessionTick.Complete(plannedEnd)
             // Count-up sessions are capped at the maximum duration.
             rs.countUp && nowMs - rs.startedAt >= Rules.MAX_MINUTES * 60_000L ->
                 SessionTick.Complete(rs.startedAt + Rules.MAX_MINUTES * 60_000L)
-
             else -> SessionTick.Continue
         }
     }

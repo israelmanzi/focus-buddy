@@ -20,6 +20,9 @@ import java.awt.PopupMenu
 import java.awt.TrayIcon
 import java.awt.Toolkit
 import java.io.File
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 object DesktopPlatform : Platform {
     override val name = "desktop"
@@ -29,6 +32,27 @@ object DesktopPlatform : Platform {
     )
     override val leavingAppInterrupts = false
     override val backupDir = File(System.getProperty("user.home"), "Documents/Focus Buddy")
+    override suspend fun checkForUpdate(): UpdateInfo? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val conn = (java.net.URL("https://api.github.com/repos/israelmanzi/focus-buddy/releases/latest")
+            .openConnection() as java.net.HttpURLConnection).apply {
+            connectTimeout = 8_000; readTimeout = 8_000
+            setRequestProperty("Accept", "application/vnd.github+json")
+        }
+        val body = try {
+            if (conn.responseCode != 200) error("HTTP ${conn.responseCode}")
+            conn.inputStream.bufferedReader().use { it.readText() }
+        } finally { conn.disconnect() }
+        val root = kotlinx.serialization.json.Json.parseToJsonElement(body).jsonObject
+        val version = root["tag_name"]?.jsonPrimitive?.contentOrNull?.removePrefix("v") ?: return@withContext null
+        val page = root["html_url"]?.jsonPrimitive?.contentOrNull ?: return@withContext null
+        val apk = null // desktops take the RPM/DEB from the release page
+        if (isNewerVersion(version)) UpdateInfo(version, apk, page) else null
+    }
+
+    override fun openUrl(url: String) {
+        runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(url)) }
+    }
+
     override fun playSound(sound: Sound) = DesktopSound.play(sound)
     override fun setAmbient(on: Boolean) = DesktopSound.ambient(on)
 

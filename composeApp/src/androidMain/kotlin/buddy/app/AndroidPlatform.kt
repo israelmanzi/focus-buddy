@@ -23,6 +23,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.lang.ref.WeakReference
+import java.net.HttpURLConnection
+import java.net.URL
+
+@kotlinx.serialization.Serializable
+private class ReleaseAsset(val name: String, val browser_download_url: String)
+
+@kotlinx.serialization.Serializable
+private class Release(val tag_name: String, val html_url: String, val assets: List<ReleaseAsset> = emptyList())
+
+private const val RELEASES_API = "https://api.github.com/repos/israelmanzi/focus-buddy/releases/latest"
+private val UpdateJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
 
 class AndroidPlatform(private val app: Application) : Platform {
     override val name = "android"
@@ -48,12 +59,71 @@ class AndroidPlatform(private val app: Application) : Platform {
 
     override fun onSessionEnded() {
         Notify.cancel(app, Notify.ID_NUDGE)
+        Notify.cancel(app, Notify.ID_SESSION)
         app.stopService(Intent(app, FocusService::class.java))
     }
 
-    override fun onLeftDuringSession(deadlineMs: Long) = Notify.nudge(app, deadlineMs)
+    override fun onSessionPaused() = Notify.paused(app)
 
-    override fun onReturned() = Notify.cancel(app, Notify.ID_NUDGE)
+    override fun onSessionResumed() = Notify.cancel(app, Notify.ID_NUDGE)
+
+    override val appVersion: String
+        get() = runCatching {
+            app.packageManager.getPackageInfo(app.packageName, 0).versionName
+        }.getOrNull().orEmpty().ifBlank { buddy.app.APP_VERSION }
+
+    override suspend fun checkForUpdate(): UpdateInfo? = withContext(Dispatchers.IO) {
+        val conn = (URL(RELEASES_API).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 8_000
+            readTimeout = 8_000
+            setRequestProperty("Accept", "application/vnd.github+json")
+        }
+        val body = try {
+            if (conn.responseCode != 200) error("HTTP ${conn.responseCode}")
+            conn.inputStream.bufferedReader().use { it.readText() }
+        } finally {
+            conn.disconnect()
+        }
+        val release = UpdateJson.decodeFromString(Release.serializer(), body)
+        val version = release.tag_name.removePrefix("v")
+        if (!isNewerVersion(version)) null
+        else UpdateInfo(
+            version = version,
+            downloadUrl = release.assets.firstOrNull { it.name.endsWith(".apk") }?.browser_download_url,
+            pageUrl = release.html_url,
+        )
+    }
+
+    override fun installUpdate(info: UpdateInfo): Boolean {
+        val url = info.downloadUrl ?: return false
+        val target = File(app.cacheDir, "focus-buddy-update.apk")
+        return runCatching {
+            Thread {
+                runCatching {
+                    val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                        connectTimeout = 10_000; readTimeout = 60_000
+                        instanceFollowRedirects = true
+                    }
+                    conn.inputStream.use { input -> target.outputStream().use { input.copyTo(it) } }
+                    conn.disconnect()
+                    val uri = androidx.core.content.FileProvider.getUriForFile(app, "${app.packageName}.updates", target)
+                    val intent = Intent(Intent.ACTION_VIEW)
+                        .setDataAndType(uri, "application/vnd.android.package-archive")
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                    app.startActivity(intent)
+                }
+            }.start()
+            true
+        }.getOrDefault(false)
+    }
+
+    override fun openUrl(url: String) {
+        runCatching {
+            app.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+
+    override fun showNotification(title: String, body: String) = Notify.general(app, title, body)
 
     override fun playSound(sound: Sound) = SoundFx.play(sound)
 

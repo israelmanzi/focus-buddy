@@ -11,11 +11,12 @@ class GameStateTest {
     private fun session(min: Int, completed: Boolean = true) =
         Payload.Session(0, min * 60_000L, min, min * 60L, Rules.DEFAULT_TAG, completed)
 
-    @Test fun rewardsCompletedSessionsOnly() {
+    @Test fun completedSessionsEarnTheBonusAbandonedOnesKeepTheirMinutes() {
         assertEquals(6, Rules.reward(session(5)))
         assertEquals(30, Rules.reward(session(25)))
-        assertEquals(0, Rules.reward(session(25, completed = false)))
-        assertEquals(0, Rules.reward(session(4)))
+        // Abandoned: one acorn per focused minute, no bonus, nothing below the minimum.
+        assertEquals(25, Rules.reward(session(25, completed = false)))
+        assertEquals(0, Rules.reward(session(4, completed = false)))
     }
 
     @Test fun purchasesNeedFundsAndAreIdempotent() {

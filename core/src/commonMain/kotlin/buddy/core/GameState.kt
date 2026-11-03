@@ -10,13 +10,17 @@ object Rules {
     const val COMPLETION_BONUS = 0.2
     const val DEFAULT_TAG = "focus"
 
-    /** Acorns for a session: 1 per focused minute, +20 % for finishing. Nothing below the minimum or if abandoned. */
+    /**
+     * Acorns for a session: 1 per focused minute; a completed session also gets the 20 % bonus.
+     * An abandoned session keeps the minutes already focused (no bonus), so giving up after an
+     * hour does not throw the hour away. Below the minimum it earns nothing.
+     */
     fun reward(s: Payload.Session): Int {
         // Clamp before the Long→Int conversion: crafted or corrupted events must not overflow into
         // a negative reward (which would take acorns away).
         val minutes = (s.focusedSec / 60).coerceIn(0, MAX_MINUTES.toLong()).toInt()
-        if (!s.completed || minutes < MIN_MINUTES) return 0
-        return minutes + ceil(minutes * COMPLETION_BONUS).toInt()
+        if (minutes < MIN_MINUTES) return 0
+        return if (s.completed) minutes + ceil(minutes * COMPLETION_BONUS).toInt() else minutes
     }
 
     /**

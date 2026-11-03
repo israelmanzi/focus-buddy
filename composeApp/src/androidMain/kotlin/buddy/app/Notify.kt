@@ -15,15 +15,18 @@ internal object Notify {
     private const val CH_SESSION = "session"
     private const val CH_NUDGE = "nudge"
     private const val CH_BREAK = "break"
+    private const val CH_GENERAL = "general"
     const val ID_SESSION = 1
     const val ID_NUDGE = 2
     const val ID_BREAK = 3
+    const val ID_GENERAL = 4
 
     fun createChannels(ctx: Context) {
         ctx.getSystemService(NotificationManager::class.java).createNotificationChannels(listOf(
             NotificationChannel(CH_SESSION, Strings.Notifications.sessionChannel, NotificationManager.IMPORTANCE_LOW),
-            NotificationChannel(CH_NUDGE, Strings.Notifications.nudgeChannel, NotificationManager.IMPORTANCE_HIGH),
+            NotificationChannel(CH_NUDGE, Strings.Notifications.nudgeChannel, NotificationManager.IMPORTANCE_DEFAULT),
             NotificationChannel(CH_BREAK, Strings.Notifications.breakChannel, NotificationManager.IMPORTANCE_HIGH),
+            NotificationChannel(CH_GENERAL, Strings.Notifications.generalChannel, NotificationManager.IMPORTANCE_DEFAULT),
         ))
     }
 
@@ -49,16 +52,19 @@ internal object Notify {
         .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
         .build()
 
-    fun nudge(ctx: Context, deadline: Long) = post(ctx, ID_NUDGE, builder(ctx, CH_NUDGE)
+    fun paused(ctx: Context) = post(ctx, ID_NUDGE, builder(ctx, CH_NUDGE)
         .setContentTitle(Strings.Notifications.nudgeTitle)
         .setContentText(Strings.Notifications.nudgeBody)
-        .setPriority(NotificationCompat.PRIORITY_HIGH)
+        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
         .setCategory(NotificationCompat.CATEGORY_REMINDER)
-        .setShowWhen(true)
-        .setUsesChronometer(true)
-        .setChronometerCountDown(true)
-        .setWhen(deadline)
-        .setTimeoutAfter((deadline - System.currentTimeMillis()).coerceAtLeast(1))
+        .setAutoCancel(true)
+        .build())
+
+    /** Session finished, session ended early, update available: the controller's own messages. */
+    fun general(ctx: Context, title: String, body: String) = post(ctx, ID_GENERAL, builder(ctx, CH_GENERAL)
+        .setContentTitle(title)
+        .setContentText(body)
+        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
         .setAutoCancel(true)
         .build())
 

@@ -48,8 +48,8 @@ class FakePlatform(
         record("onSessionStarted", Triple(startedAtMs, endsAtMs, deepFocus))
 
     override fun onSessionEnded() = record("onSessionEnded")
-    override fun onLeftDuringSession(deadlineMs: Long) = record("onLeftDuringSession", deadlineMs)
-    override fun onReturned() = record("onReturned")
+    override fun onSessionPaused() = record("onSessionPaused")
+    override fun onSessionResumed() = record("onSessionResumed")
     override fun onBreakStarted(endsAtMs: Long) = record("onBreakStarted", endsAtMs)
     override fun onBreakEnded() = record("onBreakEnded")
     override fun keepScreenOn(on: Boolean) { screenOn = on; record("keepScreenOn", on) }

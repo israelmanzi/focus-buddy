@@ -68,6 +68,12 @@ fun App(controller: AppController, initialSheet: Sheet = Sheet.NONE, initialDeco
         }
         val sky = skyFor(clockNow)
 
+        // Silent update check once per launch; the chip is the prompt.
+        var update by remember { mutableStateOf<buddy.app.UpdateInfo?>(null) }
+        LaunchedEffect(Unit) {
+            update = runCatching { controller.platform.checkForUpdate() }.getOrNull()
+        }
+
         val busy = phase !is Phase.Idle
         val focused = androidx.compose.ui.platform.LocalWindowInfo.current.isWindowFocused
         val hostActive = buddy.app.art.LocalAnimationActive.current

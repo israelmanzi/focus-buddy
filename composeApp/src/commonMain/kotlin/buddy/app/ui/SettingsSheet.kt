@@ -51,12 +51,8 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
         ScrollColumn(Modifier.weight(1f, fill = false)) {
             Section(Strings.Settings.focusSection) {
                 if (p.leavingAppInterrupts) {
-                    Text(Strings.Settings.gracePeriod, style = label(Type.body))
-                    Row(horizontalArrangement = Arrangement.spacedBy(Space.sm), modifier = Modifier.padding(vertical = Space.sm)) {
-                        listOf(10, 20, 30, 60, 120).forEach { g ->
-                            Chip(Strings.Settings.seconds(g), Ink.leaf, s.graceSec == g) { controller.updateSettings { it.copy(graceSec = g) } }
-                        }
-                    }
+                    Text(Strings.Settings.pauseNote, style = label(Type.foot, FontWeight.Medium, Ink.muted))
+                    Spacer(Modifier.height(Space.sm))
                 }
                 Toggle(Strings.Settings.keepScreenOn, s.screenOn) { v -> controller.updateSettings { it.copy(screenOn = v) } }
                 if (p.supportsExactAlarms && !p.exactAlarmsGranted()) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -144,6 +140,52 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
                 }
                 Text(Strings.Backup.folder(p.backupDir.toString()), style = label(Type.caption, FontWeight.Medium, Ink.muted))
                 note?.let { Text(it, style = label(Type.foot, FontWeight.Medium, Ink.leafDark)) }
+            }
+            Section(Strings.Updates.section) {
+                Text(Strings.Updates.version(p.appVersion), style = label(Type.small, FontWeight.Medium, Ink.muted))
+                var busy by remember { mutableStateOf(false) }
+                var available by remember { mutableStateOf<buddy.app.UpdateInfo?>(null) }
+                var status by remember { mutableStateOf<String?>(null) }
+                Spacer(Modifier.height(Space.sm))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ChunkyButton(Strings.Updates.check, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md)) {
+                        if (!busy) {
+                            busy = true
+                            status = null
+                            scope.launch {
+                                runCatching { p.checkForUpdate() }
+                                    .onSuccess { info ->
+                                        available = info
+                                        status = if (info == null) Strings.Updates.upToDate else Strings.Updates.available
+                                    }
+                                    .onFailure { status = Strings.Updates.failed }
+                                busy = false
+                            }
+                        }
+                    }
+                    Spacer(Modifier.width(Space.lg))
+                    Text(
+                        when {
+                            busy -> Strings.Updates.checking
+                            else -> status ?: ""
+                        },
+                        style = label(Type.foot, FontWeight.Medium, Ink.muted),
+                    )
+                }
+                available?.let { info ->
+                    Spacer(Modifier.height(Space.md))
+                    Text("${Strings.Updates.available}: ${info.version}", style = label(Type.foot, FontWeight.Bold, Ink.leafDark))
+                    Spacer(Modifier.height(Space.sm))
+                    if (p.name == "android") {
+                        ChunkyButton(Strings.Updates.install, color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md)) {
+                            status = if (p.installUpdate(info)) Strings.Updates.started else Strings.Updates.failed
+                        }
+                    } else {
+                        ChunkyButton(Strings.Updates.openPage, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md)) {
+                            p.openUrl(info.pageUrl)
+                        }
+                    }
+                }
             }
             Section(Strings.Settings.aboutSection) {
                 Text(

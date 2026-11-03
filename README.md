@@ -55,6 +55,11 @@ fully offline and catches up later. Backups (Settings → Backup) are plain JSON
 - the desktop uber jar and `focus-buddy-server.jar`
 - `SHA256SUMS`, published as a GitHub release
 
+Apps check the latest release on launch. The Android app shows an update chip, downloads the new
+APK and hands it to the system installer; the desktop app links to the release page. Note that an
+APK can only replace one signed with the same key, so a debug-signed side-loaded build cannot
+update to a CI-signed release; install the CI APK once to enter that track.
+
 Add `BUDDY_KEYSTORE_BASE64`, `BUDDY_KEYSTORE_PASSWORD`, `BUDDY_KEY_ALIAS` and
 `BUDDY_KEY_PASSWORD` as repository secrets to sign the APK with your own key. Without them the
 APK is debug-signed: installable, but it cannot be installed over a differently signed build.
