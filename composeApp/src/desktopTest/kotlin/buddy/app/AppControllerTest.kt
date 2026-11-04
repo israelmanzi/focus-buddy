@@ -34,7 +34,7 @@ class AppControllerTest {
         var breaksStarted = 0
         var breaksEnded = 0
 
-        override fun onSessionStarted(startedAtMs: Long, endsAtMs: Long?, deepFocus: Boolean, rules: BlockRules) {
+        override fun onSessionStarted(startedAtMs: Long, endsAtMs: Long?) {
             sessionsStarted++
         }
         override fun onSessionEnded() { sessionsEnded++ }
@@ -84,7 +84,7 @@ class AppControllerTest {
                 "dev",
                 running = RunningSession(
                     startedAt = started, plannedMin = 0, countUp = true,
-                    tag = Rules.DEFAULT_TAG, deepFocus = false, lastHeartbeat = beat,
+                    tag = Rules.DEFAULT_TAG, lastHeartbeat = beat,
                 ),
             ),
         )
@@ -105,7 +105,7 @@ class AppControllerTest {
                 "dev",
                 running = RunningSession(
                     startedAt = started, plannedMin = 25, countUp = false,
-                    tag = Rules.DEFAULT_TAG, deepFocus = false, lastHeartbeat = plannedEnd + 5_000L,
+                    tag = Rules.DEFAULT_TAG, lastHeartbeat = plannedEnd + 5_000L,
                 ),
             ),
         )
@@ -173,7 +173,7 @@ class AppControllerTest {
         c.startBreak(5)
         assertTrue(c.phase.value is Phase.OnBreak)
 
-        c.startSession(25, false, Rules.DEFAULT_TAG, false)
+        c.startSession(25, false, Rules.DEFAULT_TAG)
         assertEquals(1, platform.breaksEnded)
         assertNull(Store(dir).loadMeta().breakEndsAt)
         assertTrue(c.phase.value is Phase.Running)
@@ -182,7 +182,7 @@ class AppControllerTest {
     @Test
     fun freeCancelUsesTheInjectedClockAndClampsBackwardsJumps() {
         val c = controller()
-        c.startSession(25, false, Rules.DEFAULT_TAG, false)
+        c.startSession(25, false, Rules.DEFAULT_TAG)
         val rs = (c.phase.value as Phase.Running).session
         assertEquals(10, c.freeCancelLeft(rs))
         now += 10_000
@@ -195,7 +195,7 @@ class AppControllerTest {
     fun stoppingAtThePlannedEndStillCompletes() {
         val c = controller()
         val started = now
-        c.startSession(25, false, Rules.DEFAULT_TAG, false)
+        c.startSession(25, false, Rules.DEFAULT_TAG)
         // Beat the 500 ms ticker to the finish line.
         now = started + 25 * 60_000L
         c.stopSession()

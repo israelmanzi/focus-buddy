@@ -1,8 +1,6 @@
 package buddy.app.sim
 
 import buddy.app.AppController
-import buddy.app.AppInfo
-import buddy.app.BlockRules
 import buddy.app.Platform
 import buddy.app.Sound
 import buddy.core.BuddyJson
@@ -29,7 +27,6 @@ class FakePlatform(
     override val dataDir: File,
     override val leavingAppInterrupts: Boolean = true,
     override val supportsExactAlarms: Boolean = false,
-    override val supportsDeepFocus: Boolean = true,
 ) : Platform {
     override val name: String = "fake"
     val calls = mutableListOf<PlatformCall>()
@@ -37,15 +34,13 @@ class FakePlatform(
     var ambientPlaying = false
     var screenOn = false
     var exactAlarms = false
-    var deepFocusPermissions = true
-    var launchedApps = emptyList<AppInfo>()
 
     private fun record(name: String, arg: Any? = null) { calls += PlatformCall(name, arg) }
 
     fun callsNamed(name: String): List<PlatformCall> = calls.filter { it.name == name }
 
-    override fun onSessionStarted(startedAtMs: Long, endsAtMs: Long?, deepFocus: Boolean, rules: BlockRules) =
-        record("onSessionStarted", Triple(startedAtMs, endsAtMs, deepFocus))
+    override fun onSessionStarted(startedAtMs: Long, endsAtMs: Long?) =
+        record("onSessionStarted", startedAtMs to endsAtMs)
 
     override fun onSessionEnded() = record("onSessionEnded")
     override fun onSessionPaused() = record("onSessionPaused")
@@ -58,9 +53,6 @@ class FakePlatform(
 
     override fun exactAlarmsGranted(): Boolean = exactAlarms
     override fun requestExactAlarms() { exactAlarms = true; record("requestExactAlarms") }
-    override fun deepFocusReady(): Boolean = deepFocusPermissions && supportsDeepFocus
-    override fun requestDeepFocusPermissions() { deepFocusPermissions = true; record("requestDeepFocusPermissions") }
-    override suspend fun launchableApps(): List<AppInfo> = launchedApps
 }
 
 /** Controllable wall clock handed to [AppController]. */

@@ -72,7 +72,7 @@ class SyncSimulationTest {
         val b = device()
         try {
             // Device A focuses, then spends the reward.
-            a.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            a.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
             a.advance(25 * 60_000L)
             a.controller.dismissResult()
             a.controller.dismissResult()
@@ -90,7 +90,7 @@ class SyncSimulationTest {
             assertEquals("decor:lamp.basic.0", b.state().equipped["living.lamp"])
 
             // Device B adds a count-up session; both converge again.
-            b.controller.startSession(25, countUp = true, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            b.controller.startSession(25, countUp = true, tag = Rules.DEFAULT_TAG)
             b.advance(10 * 60_000L)
             b.controller.stopSession()
             assertIs<buddy.app.Phase.Rewarded>(b.phase())

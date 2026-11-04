@@ -6,18 +6,6 @@ import java.io.File
 
 enum class Sound { START, COMPLETE, BREAK_END, TAP }
 
-sealed interface InstallResult {
-    data object Started : InstallResult
-    /** The downloaded APK is signed differently from the installed app; one manual reinstall is needed. */
-    data object SignatureMismatch : InstallResult
-    data object Failed : InstallResult
-    /** A download is already running; ignore extra taps. */
-    data object Busy : InstallResult
-    /** Android needs the user to allow "install unknown apps" for this app before the installer runs. */
-    data object PermissionRequired : InstallResult
-}
-
-data class AppInfo(val packageName: String, val label: String)
 
 /** What the shared controller needs from the host OS. Android implements all of it; desktop mostly no-ops. */
 interface Platform {
@@ -28,7 +16,7 @@ interface Platform {
     val leavingAppInterrupts: Boolean
 
     /** Session started or resumed. `endsAtMs` is null for count-up sessions. */
-    fun onSessionStarted(startedAtMs: Long, endsAtMs: Long?, deepFocus: Boolean, rules: BlockRules) {}
+    fun onSessionStarted(startedAtMs: Long, endsAtMs: Long?) {}
     fun onSessionEnded() {}
 
     /** Kept for hosts that want to react to foreground changes; sessions keep running either way. */
@@ -57,17 +45,9 @@ interface Platform {
     /** In-app updates: check the project's GitHub releases; installing is Android-only. */
     val appVersion: String get() = APP_VERSION
     suspend fun checkForUpdate(): UpdateInfo? = null
-    suspend fun installUpdate(info: UpdateInfo, onProgress: (Float) -> Unit = {}): InstallResult = InstallResult.Failed
+
+    /** update flows open the release page; installation is left to the browser/system installer */
     fun openUrl(url: String) {}
-
-    /** Opens the per-app "install unknown apps" screen; no-op where the platform has no such gate. */
-    fun requestInstallPermission() {}
-
-    /** Deep Focus support. */
-    val supportsDeepFocus: Boolean get() = false
-    fun deepFocusReady(): Boolean = false
-    fun requestDeepFocusPermissions() {}
-    suspend fun launchableApps(): List<AppInfo> = emptyList()
 
     /** Where backups are written and looked for. */
     val backupDir: File get() = File(dataDir, "backups")
@@ -86,4 +66,3 @@ interface Platform {
     fun newestBackup(): File? = backupDir.listFiles { f -> f.name.endsWith(".json") }?.maxByOrNull { it.lastModified() }
 }
 
-data class BlockRules(val allowMode: Boolean, val packages: Set<String>)

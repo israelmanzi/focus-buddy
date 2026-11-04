@@ -39,12 +39,6 @@ sealed interface Phase {
     data class OnBreak(val endsAt: Long) : Phase
 }
 
-sealed interface UpdateState {
-    data object Idle : UpdateState
-    data class Downloading(val fraction: Float) : UpdateState
-    data class Finished(val result: InstallResult) : UpdateState
-}
-
 sealed interface SyncStatus {
     data object Off : SyncStatus
     data object Syncing : SyncStatus
@@ -76,10 +70,6 @@ class AppController(
 
     private val _phase = MutableStateFlow<Phase>(Phase.Idle)
     val phase: StateFlow<Phase> = _phase.asStateFlow()
-
-    private val _update = MutableStateFlow<UpdateState>(UpdateState.Idle)
-    /** Survives leaving Settings: the download is owned by the controller, not the screen. */
-    val update: StateFlow<UpdateState> = _update.asStateFlow()
 
     private val _sync = MutableStateFlow<SyncStatus>(if (_settings.value.syncUrl.isBlank()) SyncStatus.Off else SyncStatus.Ok(0))
     val sync: StateFlow<SyncStatus> = _sync.asStateFlow()
@@ -113,16 +103,16 @@ class AppController(
 
     // ---- focus sessions ----
 
-    fun startSession(minutes: Int, countUp: Boolean, tag: String, deepFocus: Boolean) {
+    fun startSession(minutes: Int, countUp: Boolean, tag: String) {
         if (_phase.value is Phase.Running) return
         cancelBreak()
         val planned = if (countUp) 0 else minutes.coerceIn(Rules.MIN_MINUTES, Rules.MAX_MINUTES)
-        val rs = RunningSession(clock(), planned, countUp, tag, deepFocus, lastHeartbeat = clock())
-        updateSettings { it.copy(defaultMinutes = if (countUp) it.defaultMinutes else planned, countUp = countUp, lastTag = tag, deepFocus = deepFocus) }
+        val rs = RunningSession(clock(), planned, countUp, tag, deepFocus = false, lastHeartbeat = clock())
+        updateSettings { it.copy(defaultMinutes = if (countUp) it.defaultMinutes else planned, countUp = countUp, lastTag = tag) }
         saveMeta(meta.copy(running = rs, breakEndsAt = null))
         _phase.value = Phase.Running(rs)
         val s = _settings.value
-        platform.onSessionStarted(rs.startedAt, SessionLogic.plannedEnd(rs), deepFocus, BlockRules(s.allowMode, s.packages))
+        platform.onSessionStarted(rs.startedAt, SessionLogic.plannedEnd(rs))
         platform.keepScreenOn(s.screenOn)
         if (s.sfx) platform.playSound(Sound.START)
         if (s.music) platform.setAmbient(true)
@@ -192,10 +182,10 @@ class AppController(
         checkSession(back)
     }
 
+    /** Leaving the app is allowed and never pauses; the session keeps counting. */
     fun onAppBackgrounded() {
         val rs = (_phase.value as? Phase.Running)?.session ?: return
-        if (!platform.leavingAppInterrupts || rs.deepFocus || rs.awaySince != null) return
-        beginPause(rs)
+        saveMeta(meta.copy(running = rs.copy(lastHeartbeat = clock())))
     }
 
     fun onAppForegrounded() {
@@ -231,7 +221,7 @@ class AppController(
         _phase.value = Phase.Running(rs)
         if (!checkSession(rs)) {
             val s = _settings.value
-            platform.onSessionStarted(rs.startedAt, SessionLogic.plannedEnd(rs), rs.deepFocus, BlockRules(s.allowMode, s.packages))
+            platform.onSessionStarted(rs.startedAt, SessionLogic.plannedEnd(rs))
             // Process death loses the host-side flags; restore the ones tied to the session.
             platform.keepScreenOn(s.screenOn)
             if (s.music) platform.setAmbient(true)
@@ -393,20 +383,6 @@ class AppController(
         syncJob?.cancel()
         syncJob = scope.launch { delay(2_000); syncNow() }
     }
-
-    /** Starts an in-app update download once; progress is published on [update]. */
-    fun installUpdate(info: UpdateInfo) {
-        if (_update.value is UpdateState.Downloading) return
-        _update.value = UpdateState.Downloading(0f)
-        scope.launch {
-            val result = platform.installUpdate(info) { f ->
-                if (f >= 0f) _update.value = UpdateState.Downloading(f)
-            }
-            _update.value = UpdateState.Finished(result)
-        }
-    }
-
-    fun resetUpdateState() { _update.value = UpdateState.Idle }
 
     /** Forgets the sync cursor so the next sync pulls the whole log again (repairs missed events). */
     fun resyncFromScratch() {

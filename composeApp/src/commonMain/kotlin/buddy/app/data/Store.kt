@@ -46,7 +46,7 @@ data class RunningSession(
     val plannedMin: Int,
     val countUp: Boolean,
     val tag: String,
-    val deepFocus: Boolean,
+    val deepFocus: Boolean = false,
     val awaySince: Long? = null,
     /** Last time the process was known alive while this session ran. */
     val lastHeartbeat: Long? = null,

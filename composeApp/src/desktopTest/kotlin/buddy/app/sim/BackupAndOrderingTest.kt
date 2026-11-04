@@ -22,7 +22,7 @@ class BackupAndOrderingTest {
         val h = Harness()
         h.seedSession(210, tag = "focus")
         h.controller.upsertTag("study", "Study", 0xFF6C9BD2)
-        h.controller.startSession(25, countUp = false, tag = "study", deepFocus = false)
+        h.controller.startSession(25, countUp = false, tag = "study")
         h.advance(25 * 60_000L)
         h.controller.dismissResult()
         h.controller.dismissResult()

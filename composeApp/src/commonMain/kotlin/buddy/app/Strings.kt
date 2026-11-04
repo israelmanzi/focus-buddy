@@ -67,21 +67,20 @@ object Strings {
         fun stopCountUp(minMinutes: Int) = "Stop (under $minMinutes min earns nothing)"
         const val stopFocusing = "Stop focusing"
         const val keepGoing = "Keep going"
-        const val giveUp = "Give up"
-        const val rewardTitle = "We did it"
+        const val giveUp = "End session"
+        const val rewardTitle = "Session complete"
         fun focusOf(minutes: String) = "$minutes of focus"
-        const val rewardButton = "Yay"
-        const val interruptedTitle = "Oh no"
-        fun interruptedFocused(minutes: String) =
-            "We focused for $minutes, but the session ended early. No acorns this time. Shall we try again?"
-        const val interruptedEarly = "The session ended before it really started. Let's try again?"
+        const val rewardButton = "Continue"
+        const val interruptedTitle = "Session ended early"
+        fun interruptedFocused(minutes: String) = "You focused $minutes before stopping."
+        const val interruptedEarly = "Too short to earn acorns this time. Try a longer session."
         fun interruptedKept(acorns: Int) = "You keep $acorns acorns for the time you focused."
         fun pausedPenalty(minutes: Int) = "Paused for ${formatPaused(minutes)}; earnings scaled down."
         const val okay = "Okay"
-        const val breakTitle = "Tea break?"
+        const val breakTitle = "Take a break?"
         fun breakMinutes(minutes: Int) = "$minutes min"
-        const val noThanks = "No thanks"
-        const val breakBody = "Break time. Stretch, sip, breathe."
+        const val noThanks = "Skip break"
+        const val breakBody = "Nice work. Rest your eyes for a moment before the next session."
         const val endBreak = "End break"
     }
 
@@ -144,7 +143,7 @@ object Strings {
         const val backupSection = "Backup"
         const val aboutSection = "About"
 
-        const val pauseNote = "Switch to Chrome or notes whenever you need. The timer keeps running; Deep Focus is the only thing that blocks apps."
+        const val pauseNote = "Switch to Chrome or notes whenever you need. The timer keeps running; use Pause when you want it to stop."
         fun seconds(seconds: Int) = "${seconds}s"
         const val keepScreenOn = "Keep awake while focusing"
         const val onTimeAlerts = "On-time break alerts"
@@ -164,6 +163,7 @@ object Strings {
         const val save = "Save"
         const val cancel = "Cancel"
         const val removedTags = "Removed tags"
+        const val removedHint = "Removed tags stay hidden; past sessions keep their history."
         const val tagsHint = "Add tags when starting a session."
         const val ambientMusic = "Ambient music while focusing"
         const val soundEffects = "Sound effects"
@@ -213,18 +213,8 @@ object Strings {
         const val checking = "Checking"
         const val upToDate = "You are on the latest version"
         const val available = "A new version is available"
-        const val install = "Download and install"
         const val openPage = "Open the release page"
         const val failed = "Could not check for updates"
-        const val started = "Installer opened"
-        const val busy = "A download is already running"
-        const val allowInstalls =
-            "Android needs permission to install this update. Allow installs for Focus Buddy, then tap Install again."
-        const val openSettings = "Open settings"
-        const val signatureMismatch =
-            "This release is signed with a different key, so Android cannot replace the installed app. " +
-                "Uninstall once, install this APK manually, and updates will work from then on."
-        fun downloading(percent: Int) = "Downloading $percent%"
     }
 
     object About {

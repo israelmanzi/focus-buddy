@@ -49,8 +49,6 @@ object DesktopPlatform : Platform {
         if (isNewerVersion(version)) UpdateInfo(version, apk, page) else null
     }
 
-    override suspend fun installUpdate(info: UpdateInfo, onProgress: (Float) -> Unit): InstallResult = InstallResult.Failed
-
     override fun openUrl(url: String) {
         runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(url)) }
     }
@@ -212,7 +210,6 @@ fun main() {
                                 controller.settings.value.defaultMinutes,
                                 controller.settings.value.countUp,
                                 controller.settings.value.lastTag,
-                                false,
                             )
                         }
                     },

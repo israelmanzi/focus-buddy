@@ -73,7 +73,6 @@ fun previewController(dir: File): AppController {
         override val name = "preview"
         override val dataDir = dir
         override val leavingAppInterrupts = true
-        override val supportsDeepFocus = true
     }
     val day = 86_400_000L
     val now = System.currentTimeMillis()
@@ -103,7 +102,7 @@ fun previewController(dir: File): AppController {
 fun renderScreens(dir: File, scratch: File) {
     val shots = listOf<Pair<String, (AppController) -> Unit>>(
         "home" to {}, "focus" to {}, "decorate" to {}, "shop" to {}, "editor" to {}, "stats" to {}, "settings" to {}, "rooms" to {},
-        "running" to { it.startSession(25, false, "focus", false) },
+        "running" to { it.startSession(25, false, "focus") },
     )
     for ((name, setup) in shots) {
         val c = previewController(File(scratch, name))

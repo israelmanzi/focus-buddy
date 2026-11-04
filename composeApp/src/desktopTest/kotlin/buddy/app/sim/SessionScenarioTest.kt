@@ -22,7 +22,7 @@ class SessionScenarioTest {
     fun countdownHappyPathRewardsThenOffersBreakThenEnds() {
         Harness().use { h ->
             h.controller.updateSettings { it.copy(screenOn = true, music = true, sfx = true) }
-            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
             assertIs<Phase.Running>(h.phase())
             assertEquals(Sound.START, h.platform.sounds.firstOrNull())
             assertTrue(h.platform.ambientPlaying)
@@ -64,7 +64,7 @@ class SessionScenarioTest {
     @Test
     fun statsCountsTheCompletedSession() {
         Harness().use { h ->
-            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
             h.advance(25 * 60_000L)
             val s = stats(h)
             assertEquals(1, s.totalSessions)
@@ -77,7 +77,7 @@ class SessionScenarioTest {
     @Test
     fun freeCancelWindowRecordsNothing() {
         Harness().use { h ->
-            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
             h.advance(9_000)
             assertEquals(1, h.controller.freeCancelLeft((h.phase() as Phase.Running).session))
             h.controller.stopSession()
@@ -94,7 +94,7 @@ class SessionScenarioTest {
     @Test
     fun givingUpBeforeTenPercentLeavesNoTrace() {
         Harness().use { h ->
-            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
             h.advance(11_000)
             assertEquals(0, h.controller.freeCancelLeft((h.phase() as Phase.Running).session))
             h.controller.stopSession()
@@ -110,7 +110,7 @@ class SessionScenarioTest {
     fun givingUpAfterTenPercentRecordsAnAbandonedSession() {
         Harness().use { h ->
             // 10 % of 25 minutes is 150 s; six minutes is well past it and over the 5 minute minimum.
-            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
             h.advance(6 * 60_000L)
             h.controller.stopSession()
 
@@ -126,7 +126,7 @@ class SessionScenarioTest {
     @Test
     fun exactlyTenSecondsIsNoLongerFree() {
         Harness().use { h ->
-            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
             h.advance(10_000)
             assertEquals(0, h.controller.freeCancelLeft((h.phase() as Phase.Running).session))
             h.controller.stopSession()
@@ -139,7 +139,7 @@ class SessionScenarioTest {
     @Test
     fun countUpOverFiveMinutesEarnsPerMinute() {
         Harness().use { h ->
-            h.controller.startSession(25, countUp = true, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = true, tag = Rules.DEFAULT_TAG)
             h.advance(5 * 60_000L)
             assertIs<Phase.Running>(h.phase())
             h.controller.stopSession()
@@ -158,7 +158,7 @@ class SessionScenarioTest {
     @Test
     fun countUpUnderFiveMinutesEarnsNothing() {
         Harness().use { h ->
-            h.controller.startSession(25, countUp = true, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = true, tag = Rules.DEFAULT_TAG)
             h.advance(4 * 60_000L + 59_000L)
             h.controller.stopSession()
 
@@ -173,38 +173,33 @@ class SessionScenarioTest {
     }
 
     @Test
-    fun leavingPausesTheTimerAndScalesTheReward() {
+    fun leavingTheAppKeepsTheTimerRunning() {
         Harness().use { h ->
-            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
             h.advance(60_000)
             h.controller.onAppBackgrounded()
             val away = assertIs<Phase.Running>(h.phase())
-            assertNotNull(away.session.awaySince)
-            assertEquals(1, h.platform.callsNamed("onSessionPaused").size)
+            assertEquals(null, away.session.awaySince)
+            assertTrue(h.platform.callsNamed("onSessionPaused").isEmpty())
 
             h.advance(10 * 60_000L)
-            assertIs<Phase.Running>(h.phase())
             h.controller.onAppForegrounded()
-            assertEquals(1, h.platform.callsNamed("onSessionResumed").size)
-            h.advance(24 * 60_000L)
-
+            h.advance(14 * 60_000L)
             val rewarded = assertIs<Phase.Rewarded>(h.phase())
-            // 25 focused minutes and 10 paused: 30 base acorns scaled by 25/35.
-            assertEquals(21, rewarded.acorns)
-            assertEquals(10, rewarded.pausedMin)
+            assertEquals(30, rewarded.acorns)
             assertEquals(25 * 60L, h.state().sessions.single().session.focusedSec)
-            assertEquals(10 * 60L, h.state().sessions.single().session.awaySec)
+            assertEquals(0L, h.state().sessions.single().session.awaySec)
         }
     }
 
     @Test
-    fun aBriefPauseBarelyReducesTheReward() {
+    fun aBriefManualPauseBarelyReducesTheReward() {
         Harness().use { h ->
-            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
             h.advance(60_000)
-            h.controller.onAppBackgrounded()
+            h.controller.pauseSession()
             h.advance(10_000)
-            h.controller.onAppForegrounded()
+            h.controller.resumeSession()
             assertIs<Phase.Running>(h.phase())
 
             h.advance(24 * 60_000L)
@@ -215,41 +210,23 @@ class SessionScenarioTest {
     }
 
     @Test
-    fun theSessionWaitsWhileTheUserIsInAnotherApp() {
+    fun theSessionCompletesWhileTheUserIsInAnotherApp() {
         Harness().use { h ->
-            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
             h.advance(60_000)
             h.controller.onAppBackgrounded()
             h.advance(25 * 60_000L)
-            // The planned end passed in wall-clock time, but the timer was paused.
-            assertIs<Phase.Running>(h.phase())
-
-            h.controller.onAppForegrounded()
-            h.advance(24 * 60_000L)
+            // Reading in Chrome for the rest of the session still earns the full reward.
             val rewarded = assertIs<Phase.Rewarded>(h.phase())
+            assertEquals(30, rewarded.acorns)
             assertEquals(25 * 60L, h.state().sessions.single().session.focusedSec)
-            assertEquals(24 * 60L + 60L, h.state().sessions.single().session.awaySec)
-        }
-    }
-
-    @Test
-    fun deepFocusBackgroundingIsNotAnInterruption() {
-        Harness().use { h ->
-            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = true)
-            h.advance(60_000)
-            h.controller.onAppBackgrounded()
-
-            val running = assertIs<Phase.Running>(h.phase())
-            assertEquals(null, running.session.awaySince)
-            assertTrue(h.platform.callsNamed("onSessionPaused").isEmpty())
-            assertEquals(0, h.lineCount())
         }
     }
 
     @Test
     fun manualPauseFreezesTheClockAndScalesTheReward() {
         Harness().use { h ->
-            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
             h.advance(60_000)
             h.controller.pauseSession()
             val paused = assertIs<Phase.Running>(h.phase())
@@ -271,7 +248,7 @@ class SessionScenarioTest {
     @Test
     fun stoppingWhilePausedEndsAtThePause() {
         Harness().use { h ->
-            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
             h.advance(6 * 60_000L)
             h.controller.pauseSession()
             val pausedAt = (h.phase() as Phase.Running).session.awaySince!!
@@ -288,7 +265,7 @@ class SessionScenarioTest {
     @Test
     fun desktopPlatformDoesNotInterruptWhenLeaving() {
         Harness(leavingAppInterrupts = false).use { h ->
-            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
             h.advance(60_000)
             h.controller.onAppBackgrounded()
             assertIs<Phase.Running>(h.phase())
@@ -310,8 +287,8 @@ class SessionScenarioTest {
     @Test
     fun startingASecondSessionWhileRunningIsIgnored() {
         Harness().use { h ->
-            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
-            h.controller.startSession(50, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
+            h.controller.startSession(50, countUp = false, tag = Rules.DEFAULT_TAG)
             val running = assertIs<Phase.Running>(h.phase())
             assertEquals(25, running.session.plannedMin)
         }
@@ -320,7 +297,7 @@ class SessionScenarioTest {
     @Test
     fun sessionResumesAfterProcessRestart() {
         val first = Harness()
-        first.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+        first.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
         first.advance(5 * 60_000L)
         val second = first.restart()
         try {
@@ -338,26 +315,21 @@ class SessionScenarioTest {
     }
 
     @Test
-    fun leavingJustBeforeTheEndPausesUntilReturn() {
+    fun leavingJustBeforeTheEndStillCompletes() {
         Harness().use { h ->
-            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
             h.advance(25 * 60_000L - 5_000)
             h.controller.onAppBackgrounded()
             h.advance(5_000)
-            // Paused, so the plan has not ended yet.
-            assertIs<Phase.Running>(h.phase())
-            h.controller.onAppForegrounded()
-            h.advance(5_000)
             val rewarded = assertIs<Phase.Rewarded>(h.phase())
-            // Five seconds paused out of 25 minutes: 30 * 1500/1505 rounds down to 29.
-            assertEquals(29, rewarded.acorns)
+            assertEquals(30, rewarded.acorns)
         }
     }
 
     @Test
     fun breakCanBeSkipped() {
         Harness().use { h ->
-            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG, deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = Rules.DEFAULT_TAG)
             h.advance(25 * 60_000L)
             assertIs<Phase.Rewarded>(h.phase())
             h.controller.dismissResult()

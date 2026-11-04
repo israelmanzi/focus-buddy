@@ -40,7 +40,6 @@ class AndroidPlatform(private val app: Application) : Platform {
     override val dataDir: File = File(app.filesDir, "buddy")
     override val leavingAppInterrupts = true
     override val backupDir: File get() = File(app.getExternalFilesDir(null) ?: app.filesDir, "backups")
-    override val supportsDeepFocus = true
 
     private val prefs = prefs(app)
     private val alarms = app.getSystemService(AlarmManager::class.java)
@@ -51,10 +50,10 @@ class AndroidPlatform(private val app: Application) : Platform {
         app.registerActivityLifecycleCallbacks(ActivityTracker)
     }
 
-    override fun onSessionStarted(startedAtMs: Long, endsAtMs: Long?, deepFocus: Boolean, rules: BlockRules) {
+    override fun onSessionStarted(startedAtMs: Long, endsAtMs: Long?) {
         Notify.cancel(app, Notify.ID_BREAK)
         askNotificationPermission()
-        FocusService.start(app, endsAtMs, startedAtMs, deepFocus, rules)
+        FocusService.start(app, endsAtMs, startedAtMs)
     }
 
     override fun onSessionEnded() {
@@ -92,77 +91,6 @@ class AndroidPlatform(private val app: Application) : Platform {
             downloadUrl = release.assets.firstOrNull { it.name.endsWith(".apk") }?.browser_download_url,
             pageUrl = release.html_url,
         )
-    }
-
-    private val updateRunning = java.util.concurrent.atomic.AtomicBoolean(false)
-
-    override suspend fun installUpdate(info: UpdateInfo, onProgress: (Float) -> Unit): InstallResult {
-        val url = info.downloadUrl ?: return InstallResult.Failed
-        if (!updateRunning.compareAndSet(false, true)) return InstallResult.Busy
-        try {
-            val target = File(app.cacheDir, "focus-buddy-update.apk")
-            target.delete()
-            return runCatching {
-            withContext(Dispatchers.IO) {
-                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 10_000; readTimeout = 60_000
-                    instanceFollowRedirects = true
-                }
-                val total = conn.contentLengthLong
-                conn.inputStream.use { input ->
-                    target.outputStream().use { out ->
-                        val buf = ByteArray(64 * 1024)
-                        var readTotal = 0L
-                        while (true) {
-                            val n = input.read(buf)
-                            if (n < 0) break
-                            out.write(buf, 0, n)
-                            readTotal += n
-                            if (total > 0) withContext(Dispatchers.Main) {
-                                onProgress((readTotal.toFloat() / total).coerceIn(0f, 1f))
-                            }
-                        }
-                    }
-                }
-                conn.disconnect()
-            }
-            if (!sameSigner(target)) return InstallResult.SignatureMismatch
-            // Android 8+ gates sideloaded installs behind a per-app "install unknown apps" switch.
-            if (!app.packageManager.canRequestPackageInstalls()) return InstallResult.PermissionRequired
-            withContext(Dispatchers.Main) {
-                val uri = androidx.core.content.FileProvider.getUriForFile(app, "${app.packageName}.updates", target)
-                val intent = Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(uri, "application/vnd.android.package-archive")
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                app.startActivity(intent)
-            }
-            InstallResult.Started
-            }.onFailure {
-                android.util.Log.w("FocusBuddy", "Update install failed", it)
-                withContext(Dispatchers.Main) { onProgress(-1f) }
-            }.getOrDefault(InstallResult.Failed)
-        } finally {
-            updateRunning.set(false)
-        }
-    }
-
-    /** The system refuses an APK signed by a different key; detect it before opening the installer. */
-    private fun sameSigner(apk: File): Boolean = runCatching {
-        val pm = app.packageManager
-        val flags = android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES
-        val mine = pm.getPackageInfo(app.packageName, flags).signingInfo?.apkContentsSigners?.firstOrNull()?.toByteArray()
-        val theirs = pm.getPackageArchiveInfo(apk.absolutePath, flags)?.signingInfo?.apkContentsSigners?.firstOrNull()?.toByteArray()
-        mine != null && theirs != null && mine.contentEquals(theirs)
-    }.getOrDefault(false)
-
-    override fun requestInstallPermission() {
-        if (android.os.Build.VERSION.SDK_INT < 26) return
-        runCatching {
-            app.startActivity(
-                Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, "package:${app.packageName}".toUri())
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
-        }
     }
 
     override fun openUrl(url: String) {
@@ -215,48 +143,6 @@ class AndroidPlatform(private val app: Application) : Platform {
 
     override fun keepScreenOn(on: Boolean) {
         ActivityTracker.keepScreenOn = on
-    }
-
-    override fun deepFocusReady() = hasUsageAccess() && Settings.canDrawOverlays(app)
-
-    override fun requestDeepFocusPermissions() {
-        val pkg = "package:${app.packageName}".toUri()
-        val intent = when {
-            !hasUsageAccess() -> Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, pkg)
-            !Settings.canDrawOverlays(app) -> Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, pkg)
-            else -> return
-        }
-        val ctx: Context = ActivityTracker.resumed ?: app
-        val launch = { i: Intent -> ctx.startActivity(if (ctx is Activity) i else i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-        try {
-            launch(intent)
-        } catch (_: ActivityNotFoundException) {
-            launch(Intent(intent.action)) // some builds have no per-app page
-        }
-    }
-
-    override suspend fun launchableApps(): List<AppInfo> = withContext(Dispatchers.IO) {
-        val pm = app.packageManager
-        pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
-            .filter { it.activityInfo.packageName != app.packageName }
-            .distinctBy { it.activityInfo.packageName }
-            .map { AppInfo(it.activityInfo.packageName, it.loadLabel(pm).toString()) }
-            .sortedBy { it.label.lowercase() }
-    }
-
-    private fun hasUsageAccess(): Boolean {
-        val ops = app.getSystemService(AppOpsManager::class.java)
-        val mode = if (Build.VERSION.SDK_INT >= 29) {
-            ops.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), app.packageName)
-        } else {
-            @Suppress("DEPRECATION")
-            ops.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), app.packageName)
-        }
-        return if (mode == AppOpsManager.MODE_DEFAULT) {
-            app.checkSelfPermission(Manifest.permission.PACKAGE_USAGE_STATS) == PackageManager.PERMISSION_GRANTED
-        } else {
-            mode == AppOpsManager.MODE_ALLOWED
-        }
     }
 
     private fun askNotificationPermission() {

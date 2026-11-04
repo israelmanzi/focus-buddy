@@ -35,7 +35,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import buddy.app.AppController
-import buddy.app.AppInfo
 import buddy.app.Strings
 import buddy.app.SyncStatus
 import buddy.core.Rules
@@ -48,11 +47,9 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
     val sync by controller.sync.collectAsState()
     val p = controller.platform
     val scope = rememberCoroutineScope()
-    var pickingApps by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf<String?>(null) }
     var editingTag by remember { mutableStateOf<buddy.core.TagInfo?>(null) }
 
-    if (pickingApps) { AppPicker(controller) { pickingApps = false }; return }
     editingTag?.let { TagEditor(controller, it) { editingTag = null }; return }
 
     SheetCard(onClose) {
@@ -68,20 +65,6 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
                 if (p.supportsExactAlarms && !p.exactAlarmsGranted()) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(Strings.Settings.onTimeAlerts, style = label(Type.body), modifier = Modifier.weight(1f))
                     ChunkyButton(Strings.Settings.allow, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md)) { p.requestExactAlarms() }
-                }
-            }
-            if (p.supportsDeepFocus) Section(Strings.Settings.deepFocusSection) {
-                val ready = p.deepFocusReady()
-                Text(
-                    if (ready) Strings.Settings.permissionsGranted else Strings.Settings.permissionsNeeded,
-                    style = label(Type.small, FontWeight.Medium, if (ready) Ink.leafDark else Ink.berry),
-                )
-                if (!ready) ChunkyButton(Strings.Settings.grantPermissions, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md)) { p.requestDeepFocusPermissions() }
-                Spacer(Modifier.height(Space.sm))
-                Tabs(listOf(Strings.Settings.blockChosen, Strings.Settings.allowOnly), if (s.allowMode) 1 else 0, { i -> controller.updateSettings { it.copy(allowMode = i == 1) } })
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = Space.md)) {
-                    Text(Strings.Settings.appsChosen(s.packages.size), style = label(Type.body), modifier = Modifier.weight(1f))
-                    ChunkyButton(Strings.Settings.chooseApps, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md)) { pickingApps = true }
                 }
             }
             Section(Strings.Settings.tagsSection) {
@@ -104,6 +87,7 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
                 if (removed.isNotEmpty()) {
                     Spacer(Modifier.height(Space.sm))
                     Text(Strings.Settings.removedTags, style = label(Type.foot, FontWeight.Bold, Ink.muted))
+                    Text(Strings.Settings.removedHint, style = label(Type.caption, FontWeight.Medium, Ink.muted))
                     removed.forEach { t ->
                         Row(Modifier.fillMaxWidth().padding(vertical = Space.xxs), verticalAlignment = Alignment.CenterVertically) {
                             TagDot(Color(t.color).copy(alpha = 0.45f))
@@ -205,42 +189,8 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
                     Spacer(Modifier.height(Space.md))
                     Text("${Strings.Updates.available}: ${info.version}", style = label(Type.foot, FontWeight.Bold, Ink.leafDark))
                     Spacer(Modifier.height(Space.sm))
-                    if (p.name == "android") {
-                        val updateState by controller.update.collectAsState()
-                        val progress = (updateState as? buddy.app.UpdateState.Downloading)?.fraction
-                        ChunkyButton(Strings.Updates.install, color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md), enabled = progress == null) {
-                            controller.installUpdate(info)
-                        }
-                        progress?.let { f ->
-                            Spacer(Modifier.height(Space.sm))
-                            androidx.compose.material3.LinearProgressIndicator(
-                                progress = { f.coerceIn(0f, 1f) },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                        androidx.compose.runtime.LaunchedEffect(updateState) {
-                            status = when (val us = updateState) {
-                                is buddy.app.UpdateState.Downloading -> Strings.Updates.downloading((us.fraction * 100).toInt())
-                                is buddy.app.UpdateState.Finished -> when (us.result) {
-                                    buddy.app.InstallResult.Started -> Strings.Updates.started
-                                    buddy.app.InstallResult.SignatureMismatch -> Strings.Updates.signatureMismatch
-                                    buddy.app.InstallResult.Busy -> Strings.Updates.busy
-                                    buddy.app.InstallResult.PermissionRequired -> Strings.Updates.allowInstalls
-                                    buddy.app.InstallResult.Failed -> Strings.Updates.failed
-                                }
-                                buddy.app.UpdateState.Idle -> null
-                            }
-                        }
-                        if (status == Strings.Updates.allowInstalls) {
-                            Spacer(Modifier.height(Space.sm))
-                            ChunkyButton(Strings.Updates.openSettings, color = Ink.butter, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md)) {
-                                p.requestInstallPermission()
-                            }
-                        }
-                    } else {
-                        ChunkyButton(Strings.Updates.openPage, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md)) {
-                            p.openUrl(info.pageUrl)
-                        }
+                    ChunkyButton(Strings.Updates.openPage, color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md)) {
+                        p.openUrl(info.pageUrl)
                     }
                 }
             }
@@ -276,39 +226,6 @@ private fun Toggle(text: String, value: Boolean, onChange: (Boolean) -> Unit) {
         BuddySwitch(value, onChange)
     }
 }
-
-@Composable
-private fun AppPicker(controller: AppController, onClose: () -> Unit) {
-    val s by controller.settings.collectAsState()
-    var apps by remember { mutableStateOf<List<AppInfo>?>(null) }
-    LaunchedEffect(Unit) { apps = controller.platform.launchableApps() }
-    SheetCard(onClose) {
-        Title(if (s.allowMode) Strings.Settings.allowedApps else Strings.Settings.blockedApps, Type.title)
-        Spacer(Modifier.height(Space.md))
-        ScrollColumn(Modifier.weight(1f, fill = false), horizontalAlignment = Alignment.Start) {
-            val list = apps
-            if (list == null) Text(Strings.Settings.loading, style = label(Type.body))
-            list?.forEach { a ->
-                val on = a.packageName in s.packages
-                Row(
-                    Modifier.fillMaxWidth().tap {
-                        controller.updateSettings { it.copy(packages = if (on) it.packages - a.packageName else it.packages + a.packageName) }
-                    }.padding(vertical = Space.xxs),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Checkbox(on, null, colors = CheckboxDefaults.colors(checkedColor = Ink.leaf, uncheckedColor = Ink.outline))
-                    Column {
-                        Text(a.label, style = label(Type.body))
-                        Text(a.packageName, style = label(Type.micro, FontWeight.Normal, Ink.muted))
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(Space.md))
-        ChunkyButton(Strings.Settings.done, color = Ink.leaf, textColor = Ink.onSelected) { onClose() }
-    }
-}
-
 
 @Composable
 private fun TagEditor(controller: AppController, tag: buddy.core.TagInfo, onClose: () -> Unit) {

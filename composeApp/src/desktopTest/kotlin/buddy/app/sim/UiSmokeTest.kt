@@ -79,37 +79,37 @@ class UiSmokeTest {
 
         // Running sessions, including the maximum duration and the grace-period overlay.
         shot("running-6-hours") { h ->
-            h.controller.startSession(360, countUp = false, tag = "focus", deepFocus = false)
+            h.controller.startSession(360, countUp = false, tag = "focus")
         }
         shot("running-25-min") { h ->
-            h.controller.startSession(25, countUp = false, tag = "focus", deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = "focus")
             h.advance(60_000)
         }
         shot("running-while-away") { h ->
-            h.controller.startSession(25, countUp = false, tag = "focus", deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = "focus")
             h.advance(60_000)
             h.controller.onAppBackgrounded()
             assertTrue(h.phase() is Phase.Running)
         }
         shot("running-count-up") { h ->
-            h.controller.startSession(25, countUp = true, tag = "focus", deepFocus = false)
+            h.controller.startSession(25, countUp = true, tag = "focus")
             h.advance(10 * 60_000L)
         }
 
         // End-of-session cards and break states.
         shot("rewarded") { h ->
-            h.controller.startSession(25, countUp = false, tag = "focus", deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = "focus")
             h.advance(25 * 60_000L)
             assertTrue(h.phase() is Phase.Rewarded)
         }
         shot("interrupted") { h ->
-            h.controller.startSession(25, countUp = false, tag = "focus", deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = "focus")
             h.advance(200_000) // past 10 % of 25 minutes, so the abandon is kept
             h.controller.stopSession()
             assertTrue(h.phase() is Phase.Interrupted)
         }
         shot("break-offer") { h ->
-            h.controller.startSession(25, countUp = false, tag = "focus", deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = "focus")
             h.advance(25 * 60_000L)
             h.controller.dismissResult()
             assertTrue(h.phase() is Phase.BreakOffer)

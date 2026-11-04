@@ -73,7 +73,6 @@ fun FocusSetup(controller: AppController, onClose: () -> Unit) {
     var minutes by remember { mutableStateOf(settings.defaultMinutes.toFloat()) }
     var countUp by remember { mutableStateOf(settings.countUp) }
     var tag by remember { mutableStateOf(settings.lastTag.takeIf { it in state.tags } ?: Rules.DEFAULT_TAG) }
-    var deep by remember { mutableStateOf(settings.deepFocus && controller.platform.supportsDeepFocus) }
     var newTag by remember { mutableStateOf<String?>(null) }
     val p = controller.platform
 
@@ -133,33 +132,11 @@ fun FocusSetup(controller: AppController, onClose: () -> Unit) {
                     }
                 }
             }
-            if (p.supportsDeepFocus) {
-                Row(Modifier.fillMaxWidth().padding(top = Space.lg), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(Strings.Focus.deepFocus, style = label(Type.lead))
-                        Text(
-                            when {
-                                !deep -> Strings.Focus.leavePauses
-                                !p.deepFocusReady() -> Strings.Focus.needsPermissions
-                                settings.packages.isEmpty() -> Strings.Focus.noApps
-                                settings.allowMode -> Strings.Focus.onlyApps(settings.packages.size)
-                                else -> Strings.Focus.blocksApps(settings.packages.size)
-                            },
-                            style = label(Type.foot, FontWeight.Normal, Ink.muted),
-                        )
-                    }
-                    if (deep && !p.deepFocusReady()) {
-                        ChunkyButton(Strings.Focus.setUp, fontSize = Type.small, padding = PaddingValues(Space.lg, Space.sm)) { p.requestDeepFocusPermissions() }
-                        Spacer(Modifier.width(Space.md))
-                    }
-                    BuddySwitch(deep) { deep = it }
-                }
-            }
             Spacer(Modifier.height(Space.xxl))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.xl), verticalAlignment = Alignment.CenterVertically) {
                 ChunkyButton(Strings.Focus.back, color = Ink.berry, textColor = Ink.onSelected, fontSize = Type.bodyLarge) { onClose() }
                 ChunkyButton(Strings.Focus.start, color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.titleLarge) {
-                    controller.startSession(minutes.toInt(), countUp, tag, deep && p.deepFocusReady())
+                    controller.startSession(minutes.toInt(), countUp, tag)
                     onClose()
                 }
             }
@@ -184,16 +161,13 @@ fun RunningScreen(controller: AppController, phase: Phase.Running) {
             tagInfo?.let { Chip(it.name, Color(it.color), true) {} }
             Spacer(Modifier.height(Space.lg))
             RunningClock(rs, now)
-            if (rs.deepFocus) Text(Strings.Session.deepFocusOn, style = label(Type.small, color = Ink.butter))
             Spacer(Modifier.height(Space.xxxl))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.lg), verticalAlignment = Alignment.CenterVertically) {
-                if (!rs.deepFocus) {
-                    ChunkyButton(
-                        if (rs.awaySince != null) Strings.Session.resume else Strings.Session.pause,
-                        color = Ink.butter, fontSize = Type.bodyLarge,
-                    ) {
-                        if (rs.awaySince != null) controller.resumeSession() else controller.pauseSession()
-                    }
+                ChunkyButton(
+                    if (rs.awaySince != null) Strings.Session.resume else Strings.Session.pause,
+                    color = Ink.butter, fontSize = Type.bodyLarge,
+                ) {
+                    if (rs.awaySince != null) controller.resumeSession() else controller.pauseSession()
                 }
                 RunningStop(controller, rs, now)
             }
@@ -303,6 +277,12 @@ fun BreakOffer(controller: AppController) {
         ScrollColumn {
             PipView(state.style, Mood.BREAK, Modifier.size(140.dp, 130.dp))
             Title(Strings.Session.breakTitle, Type.titleLarge)
+            Spacer(Modifier.height(Space.sm))
+            Text(
+                Strings.Session.breakBody,
+                style = label(Type.lead, FontWeight.Medium, Ink.muted),
+                textAlign = TextAlign.Center,
+            )
             Spacer(Modifier.height(Space.xl))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
                 listOf(5, 10, 15).forEach { m ->

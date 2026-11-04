@@ -53,13 +53,13 @@ fun main() {
             // Some days the user gives up mid-session, or uses the stopwatch.
             when (day % 3) {
                 0 -> {
-                    h.controller.startSession(50, countUp = false, tag = "study", deepFocus = false)
+                    h.controller.startSession(50, countUp = false, tag = "study")
                     h.advance(17 * 60_000L)
                     h.controller.stopSession() // gave up after the free window
                     h.controller.dismissResult()
                 }
                 1 -> {
-                    h.controller.startSession(25, countUp = true, tag = "writing", deepFocus = false)
+                    h.controller.startSession(25, countUp = true, tag = "writing")
                     h.advance(11 * 60_000L)
                     h.controller.stopSession()
                     h.controller.dismissResult()
@@ -91,7 +91,7 @@ private val wishlist = listOf(
 )
 
 private fun focus(h: Harness, minutes: Int, tag: String, deep: Boolean) {
-    h.controller.startSession(minutes, countUp = false, tag = tag, deepFocus = deep)
+    h.controller.startSession(minutes, countUp = false, tag = tag)
     h.advance(minutes * 60_000L)
     check(h.phase() is Phase.Rewarded) { "expected a reward for a $minutes min session" }
     h.controller.dismissResult() // reward -> break offer

@@ -33,18 +33,16 @@ reference and is git-ignored.
 - Desktop: leaving the window does not fail a session (you work in other apps there).
 - The room sky follows local time and season: sunrise/sunset are modelled from the day of the year
   (northern-hemisphere approximation), so evenings turn dark when the sun actually sets.
-- Deep Focus (Android): during a session, opening a blocked app shows a full-screen overlay
-  that sends you back. Block list *or* allow list mode.
 - Breaks: after completion, offer a 5/10/15-min break or skip.
 - Keep-awake option while focusing.
-- In-app updates: checks the project's GitHub releases on launch and shows an update chip; on
-  Android it downloads and hands the APK to the system installer; on desktop it opens the release
-  page (the RPM/DEB are installed by the system package manager).
+- Updates: checks the project's GitHub releases on launch and shows an update chip that opens the
+  release page; installation is left to the browser/system installer, so the app needs no install
+  permission.
 
 ## Rewards and economy (single currency: acorns)
 - 1 acorn per focused minute, +20 % bonus for completing the planned duration.
 - Count-up sessions earn per minute (≥ 5 min to count).
-- Abandoned sessions earn nothing.
+- Abandoned sessions keep 1 acorn per focused minute (no completion bonus); pauses scale the payout by focused share.
 - Spending: decor items, room unlocks, skins, outfits. Prices tuned so a few days of normal use
   unlocks a room and a week or two unlocks most of the catalogue.
 

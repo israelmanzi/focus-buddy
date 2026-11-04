@@ -211,7 +211,7 @@ class EconomyScenarioTest {
             assertEquals(8, tag.id.length)
             assertFalse(tag.archived)
 
-            h.controller.startSession(25, countUp = false, tag = tag.id, deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = tag.id)
             h.advance(25 * 60_000L)
             assertEquals(30, h.state().acorns)
             assertEquals(tag.id, h.state().sessions.single().session.tag)
@@ -236,7 +236,7 @@ class EconomyScenarioTest {
     fun archivedTagStillResolvesForOldSessions() {
         Harness().use { h ->
             h.controller.upsertTag("old", "Old work", 0xFF112233, archived = true)
-            h.controller.startSession(25, countUp = false, tag = "old", deepFocus = false)
+            h.controller.startSession(25, countUp = false, tag = "old")
             h.advance(25 * 60_000L)
             val stats = Stats(h.state(), TimeZone.currentSystemDefault(), h.controller.now())
             assertEquals(listOf("old" to 25), stats.byTag(StatsRange.DAY))
