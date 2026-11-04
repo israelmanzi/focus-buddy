@@ -1,7 +1,7 @@
 package buddy.app
 
 /** Keep in sync with `versionName` in composeApp/build.gradle.kts and the release tag. */
-const val APP_VERSION = "0.2.5"
+const val APP_VERSION = "0.2.6"
 
 data class UpdateInfo(
     val version: String,

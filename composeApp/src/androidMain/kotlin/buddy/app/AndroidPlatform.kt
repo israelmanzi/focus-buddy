@@ -94,10 +94,15 @@ class AndroidPlatform(private val app: Application) : Platform {
         )
     }
 
+    private val updateRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+
     override suspend fun installUpdate(info: UpdateInfo, onProgress: (Float) -> Unit): InstallResult {
         val url = info.downloadUrl ?: return InstallResult.Failed
-        val target = File(app.cacheDir, "focus-buddy-update.apk")
-        return runCatching {
+        if (!updateRunning.compareAndSet(false, true)) return InstallResult.Busy
+        try {
+            val target = File(app.cacheDir, "focus-buddy-update.apk")
+            target.delete()
+            return runCatching {
             withContext(Dispatchers.IO) {
                 val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                     connectTimeout = 10_000; readTimeout = 60_000
@@ -122,6 +127,8 @@ class AndroidPlatform(private val app: Application) : Platform {
                 conn.disconnect()
             }
             if (!sameSigner(target)) return InstallResult.SignatureMismatch
+            // Android 8+ gates sideloaded installs behind a per-app "install unknown apps" switch.
+            if (!app.packageManager.canRequestPackageInstalls()) return InstallResult.PermissionRequired
             withContext(Dispatchers.Main) {
                 val uri = androidx.core.content.FileProvider.getUriForFile(app, "${app.packageName}.updates", target)
                 val intent = Intent(Intent.ACTION_VIEW)
@@ -130,10 +137,13 @@ class AndroidPlatform(private val app: Application) : Platform {
                 app.startActivity(intent)
             }
             InstallResult.Started
-        }.onFailure {
-            android.util.Log.w("FocusBuddy", "Update install failed", it)
-            withContext(Dispatchers.Main) { onProgress(-1f) }
-        }.getOrDefault(InstallResult.Failed)
+            }.onFailure {
+                android.util.Log.w("FocusBuddy", "Update install failed", it)
+                withContext(Dispatchers.Main) { onProgress(-1f) }
+            }.getOrDefault(InstallResult.Failed)
+        } finally {
+            updateRunning.set(false)
+        }
     }
 
     /** The system refuses an APK signed by a different key; detect it before opening the installer. */
@@ -144,6 +154,16 @@ class AndroidPlatform(private val app: Application) : Platform {
         val theirs = pm.getPackageArchiveInfo(apk.absolutePath, flags)?.signingInfo?.apkContentsSigners?.firstOrNull()?.toByteArray()
         mine != null && theirs != null && mine.contentEquals(theirs)
     }.getOrDefault(false)
+
+    override fun requestInstallPermission() {
+        if (android.os.Build.VERSION.SDK_INT < 26) return
+        runCatching {
+            app.startActivity(
+                Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, "package:${app.packageName}".toUri())
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
+    }
 
     override fun openUrl(url: String) {
         runCatching {

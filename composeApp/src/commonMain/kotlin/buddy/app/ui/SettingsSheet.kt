@@ -206,23 +206,10 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
                     Text("${Strings.Updates.available}: ${info.version}", style = label(Type.foot, FontWeight.Bold, Ink.leafDark))
                     Spacer(Modifier.height(Space.sm))
                     if (p.name == "android") {
-                        var progress by remember(info.version) { mutableStateOf<Float?>(null) }
-                        ChunkyButton(Strings.Updates.install, color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md)) {
-                            progress = 0f
-                            status = Strings.Updates.downloading(0)
-                            scope.launch {
-                                val r = p.installUpdate(info) { f ->
-                                    if (f >= 0f) {
-                                        progress = f
-                                        status = Strings.Updates.downloading((f * 100).toInt())
-                                    } else progress = null
-                                }
-                                when (r) {
-                                    buddy.app.InstallResult.Started -> status = Strings.Updates.started
-                                    buddy.app.InstallResult.SignatureMismatch -> status = Strings.Updates.signatureMismatch
-                                    buddy.app.InstallResult.Failed -> { status = Strings.Updates.failed; progress = null }
-                                }
-                            }
+                        val updateState by controller.update.collectAsState()
+                        val progress = (updateState as? buddy.app.UpdateState.Downloading)?.fraction
+                        ChunkyButton(Strings.Updates.install, color = Ink.leaf, textColor = Ink.onSelected, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md), enabled = progress == null) {
+                            controller.installUpdate(info)
                         }
                         progress?.let { f ->
                             Spacer(Modifier.height(Space.sm))
@@ -230,6 +217,25 @@ fun SettingsSheet(controller: AppController, onClose: () -> Unit) {
                                 progress = { f.coerceIn(0f, 1f) },
                                 modifier = Modifier.fillMaxWidth(),
                             )
+                        }
+                        androidx.compose.runtime.LaunchedEffect(updateState) {
+                            status = when (val us = updateState) {
+                                is buddy.app.UpdateState.Downloading -> Strings.Updates.downloading((us.fraction * 100).toInt())
+                                is buddy.app.UpdateState.Finished -> when (us.result) {
+                                    buddy.app.InstallResult.Started -> Strings.Updates.started
+                                    buddy.app.InstallResult.SignatureMismatch -> Strings.Updates.signatureMismatch
+                                    buddy.app.InstallResult.Busy -> Strings.Updates.busy
+                                    buddy.app.InstallResult.PermissionRequired -> Strings.Updates.allowInstalls
+                                    buddy.app.InstallResult.Failed -> Strings.Updates.failed
+                                }
+                                buddy.app.UpdateState.Idle -> null
+                            }
+                        }
+                        if (status == Strings.Updates.allowInstalls) {
+                            Spacer(Modifier.height(Space.sm))
+                            ChunkyButton(Strings.Updates.openSettings, color = Ink.butter, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md)) {
+                                p.requestInstallPermission()
+                            }
                         }
                     } else {
                         ChunkyButton(Strings.Updates.openPage, fontSize = Type.body, padding = PaddingValues(Space.xl, Space.md)) {

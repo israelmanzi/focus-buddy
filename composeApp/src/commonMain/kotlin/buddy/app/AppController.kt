@@ -39,6 +39,12 @@ sealed interface Phase {
     data class OnBreak(val endsAt: Long) : Phase
 }
 
+sealed interface UpdateState {
+    data object Idle : UpdateState
+    data class Downloading(val fraction: Float) : UpdateState
+    data class Finished(val result: InstallResult) : UpdateState
+}
+
 sealed interface SyncStatus {
     data object Off : SyncStatus
     data object Syncing : SyncStatus
@@ -70,6 +76,10 @@ class AppController(
 
     private val _phase = MutableStateFlow<Phase>(Phase.Idle)
     val phase: StateFlow<Phase> = _phase.asStateFlow()
+
+    private val _update = MutableStateFlow<UpdateState>(UpdateState.Idle)
+    /** Survives leaving Settings: the download is owned by the controller, not the screen. */
+    val update: StateFlow<UpdateState> = _update.asStateFlow()
 
     private val _sync = MutableStateFlow<SyncStatus>(if (_settings.value.syncUrl.isBlank()) SyncStatus.Off else SyncStatus.Ok(0))
     val sync: StateFlow<SyncStatus> = _sync.asStateFlow()
@@ -383,6 +393,20 @@ class AppController(
         syncJob?.cancel()
         syncJob = scope.launch { delay(2_000); syncNow() }
     }
+
+    /** Starts an in-app update download once; progress is published on [update]. */
+    fun installUpdate(info: UpdateInfo) {
+        if (_update.value is UpdateState.Downloading) return
+        _update.value = UpdateState.Downloading(0f)
+        scope.launch {
+            val result = platform.installUpdate(info) { f ->
+                if (f >= 0f) _update.value = UpdateState.Downloading(f)
+            }
+            _update.value = UpdateState.Finished(result)
+        }
+    }
+
+    fun resetUpdateState() { _update.value = UpdateState.Idle }
 
     /** Forgets the sync cursor so the next sync pulls the whole log again (repairs missed events). */
     fun resyncFromScratch() {

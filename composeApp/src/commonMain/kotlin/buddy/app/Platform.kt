@@ -11,6 +11,10 @@ sealed interface InstallResult {
     /** The downloaded APK is signed differently from the installed app; one manual reinstall is needed. */
     data object SignatureMismatch : InstallResult
     data object Failed : InstallResult
+    /** A download is already running; ignore extra taps. */
+    data object Busy : InstallResult
+    /** Android needs the user to allow "install unknown apps" for this app before the installer runs. */
+    data object PermissionRequired : InstallResult
 }
 
 data class AppInfo(val packageName: String, val label: String)
@@ -55,6 +59,9 @@ interface Platform {
     suspend fun checkForUpdate(): UpdateInfo? = null
     suspend fun installUpdate(info: UpdateInfo, onProgress: (Float) -> Unit = {}): InstallResult = InstallResult.Failed
     fun openUrl(url: String) {}
+
+    /** Opens the per-app "install unknown apps" screen; no-op where the platform has no such gate. */
+    fun requestInstallPermission() {}
 
     /** Deep Focus support. */
     val supportsDeepFocus: Boolean get() = false

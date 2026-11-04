@@ -217,6 +217,10 @@ object Strings {
         const val openPage = "Open the release page"
         const val failed = "Could not check for updates"
         const val started = "Installer opened"
+        const val busy = "A download is already running"
+        const val allowInstalls =
+            "Android needs permission to install this update. Allow installs for Focus Buddy, then tap Install again."
+        const val openSettings = "Open settings"
         const val signatureMismatch =
             "This release is signed with a different key, so Android cannot replace the installed app. " +
                 "Uninstall once, install this APK manually, and updates will work from then on."
